@@ -1,6 +1,9 @@
 # DHA Disease Registry
 
-Local development scaffold for a disease registry on licensed InterSystems IRIS for Health. Docker Compose starts IRIS for Health and a matching Web Gateway, creates the `DISEASEREGISTRY` namespace and database, and imports all ObjectScript classes under `src/`.
+Local development scaffold for a disease registry on licensed InterSystems IRIS for Health. Docker Compose starts IRIS for Health and a matching Web Gateway, creates the interoperability-enabled `DISEASEREGISTRY` namespace and database, and imports all ObjectScript classes under `src/`. Interoperability enablement supplies the mappings and portal registration required for Analytics.
+
+Bootstrap also upgrades an existing `DISEASEREGISTRY` volume that was created
+without interoperability support; deleting the Docker volume is not required.
 
 ## Prerequisites
 
@@ -52,6 +55,98 @@ Useful commands:
 ./bin/stop        # Stop the container, preserving data
 docker compose down -v  # Delete the container AND all local IRIS data
 ```
+
+## Business Intelligence cubes
+
+The project includes two synchronized IRIS BI cubes:
+
+| Persistent source | DSTIME | Logical cube |
+| --- | --- | --- |
+| `DiseaseRegistry.Model.Patient` | `AUTO` | `DiseaseRegistryPatients` |
+| `DiseaseRegistry.Model.Diagnosis` | `AUTO` | `DiseaseRegistryDiagnoses` |
+
+Both source classes use a five-second `DSINTERVAL`. Inserts, updates, and deletes
+are therefore recorded in `^OBJ.DSTIME` and can be applied with cube
+synchronization rather than a full rebuild.
+
+### Load demo data and build
+
+The analytics demo is opt-in. It is never run during container bootstrap. From
+the `DISEASEREGISTRY` terminal, generate deterministic sample data, build both
+cubes, create two saved pivots, and warm their queries:
+
+```objectscript
+set sc=##class(DiseaseRegistry.Util.Analytics).SetupDemo(50,500,1,1)
+do $SYSTEM.OBJ.DisplayError(sc)
+```
+
+The third argument resets only `DiseaseRegistry.Model.Patient` and
+`DiseaseRegistry.Model.Diagnosis`. Do not use reset mode after replacing the demo
+model with real registry data.
+
+The saved pivots are created under the BI user-library folder `Disease Registry`:
+
+- `Patients by Status.pivot`
+- `Diagnoses by Group.pivot`
+
+### Exercise cube synchronization
+
+Generate patient and diagnosis changes:
+
+```objectscript
+set sc=##class(DiseaseRegistry.Util.Analytics).MakeChanges(10,6,2,3)
+do $SYSTEM.OBJ.DisplayError(sc)
+```
+
+Synchronize both cubes and warm their saved queries:
+
+```objectscript
+set sc=##class(DiseaseRegistry.Util.Analytics).SynchronizeAll(1)
+do $SYSTEM.OBJ.DisplayError(sc)
+```
+
+`SynchronizeAll()` reports the number of patient and diagnosis facts updated.
+You can inspect `^OBJ.DSTIME` between the two calls to see the pending source IDs.
+
+### Configure automatic cache warming
+
+The generated `DiseaseRegistry.CubeRegistry` is activated during bootstrap. It
+registers each cube in an enabled Cube Manager schedule group that runs every
+five minutes. Since both cubes support synchronization, routine updates use
+cube synchronization. Cube Manager falls back to a build when a cube has not
+yet been built.
+
+Open **Analytics > Admin > Cube Manager** to inspect or adjust the schedules.
+If you change the Cube Manager configuration, export the generated
+`DiseaseRegistry.CubeRegistry` class back into `src/` to preserve the change.
+
+The included registry uses the following Post-Build Code and Post-Synchronize
+Code for each cube:
+
+```objectscript
+do ##class(DiseaseRegistry.Util.CacheWarmer).QueueCube("DiseaseRegistryPatients")
+```
+
+```objectscript
+do ##class(DiseaseRegistry.Util.CacheWarmer).QueueCube("DiseaseRegistryDiagnoses")
+```
+
+The warmer runs as a background job, waits until the cube is queryable, and
+coalesces duplicate workers for the same cube. This ensures it runs after the
+build's final obsolete-cache purge. Outcomes are written to
+`DeepSeeTasks_DISEASEREGISTRY.log` with source label `DiseaseReg`.
+
+To execute an important MDX query that is not saved as a pivot:
+
+```objectscript
+set mdx="SELECT {[Measures].[%Count]} ON 0, [Disease].[Disease Group].Members ON 1 FROM [DiseaseRegistryDiagnoses]"
+set sc=##class(DiseaseRegistry.Util.CacheWarmer).WarmMDX(mdx,.parameters,1,.stats)
+do $SYSTEM.OBJ.DisplayError(sc)
+zwrite stats
+```
+
+Cache warming consumes CPU and I/O, so production deployments should warm only
+high-value dashboard queries and parameter combinations.
 
 ## Persistence and code injection
 

@@ -7,7 +7,7 @@ XData Setup
   <Default Name="SourceDir" Value="/workspace/src"/>
   <Default Name="Namespace" Value="DISEASEREGISTRY"/>
   <Default Name="DatabaseDir" Value="/durable/databases/DISEASEREGISTRY"/>
-  <Namespace Name="${Namespace}" Code="${Namespace}" Data="${Namespace}" Create="yes" Ensemble="0">
+  <Namespace Name="${Namespace}" Code="${Namespace}" Data="${Namespace}" Create="yes" Ensemble="1">
     <Configuration>
       <Database Name="${Namespace}" Dir="${DatabaseDir}" Create="yes" Resource="%DB_${Namespace}"/>
     </Configuration>
@@ -30,11 +30,21 @@ ClassMethod Bootstrap() As %Status
   If '##class(%SYS.Namespace).Exists("DISEASEREGISTRY") {
     Set sc = ..Setup()
     If $SYSTEM.Status.IsError(sc) Quit sc
+  } ElseIf '##class(%Library.EnsembleMgr).IsEnsembleNamespace("DISEASEREGISTRY") {
+    // Upgrade volumes created by a bootstrap that used Ensemble="0".
+    Set sc = ##class(%Library.EnsembleMgr).EnableNamespace("DISEASEREGISTRY", 1)
+    If $SYSTEM.Status.IsError(sc) Quit sc
   }
 
   Set previousNamespace = $Namespace
   Set $Namespace = "DISEASEREGISTRY"
   Set sc = $SYSTEM.OBJ.LoadDir("/workspace/src", "ck", , 1)
+  If '$SYSTEM.Status.IsError(sc) {
+    Set sc = ##class(%DeepSee.CubeManager.Utils).SetActiveRegistry("DiseaseRegistry.CubeRegistry", 1)
+  }
+  If '$SYSTEM.Status.IsError(sc) {
+    Set sc = ##class(%DeepSee.CubeManager.Utils).ScheduleUpdaterTasks()
+  }
   Set $Namespace = previousNamespace
 
   Quit sc
