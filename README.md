@@ -136,8 +136,10 @@ do ##class(DiseaseRegistry.Util.CacheWarmer).QueueCube("DiseaseRegistryDiagnoses
 ```
 
 The warmer runs as a background job, waits until the cube is queryable, and
-coalesces duplicate workers for the same cube. It warms every matching saved
-pivot and then discovers pivot widgets on saved dashboards. For each widget it
+coalesces duplicate workers for the same cube. It first discovers saved
+dashboards in automatic usage order and warms each dashboard's saved base pivots
+and default-filter variants before moving to the next dashboard. It then warms
+matching saved pivots that are not referenced by any dashboard. For each widget it
 combines the widget's saved filter state and applicable `applyFilter` or
 `setFilter` control defaults into the same filtered MDX shape used when the
 dashboard opens. Static values and `@` runtime settings are supported; runtime
@@ -145,6 +147,35 @@ settings are evaluated in the worker's user/security context. Keeping the query
 workload in a separate process prevents slow MDX queries from extending the Cube
 Manager task. Summary outcomes are written to
 `DeepSeeTasks_DISEASEREGISTRY.log` with source label `DiseaseReg`.
+
+Bootstrap installs IRIS BI's documented [`^DeepSee.AuditCode` dashboard-access
+hook](https://docs.intersystems.com/irisforhealthlatest/csp/docbook/DocBook.UI.Page.cls?KEY=D2IMP_ch_dev).
+Each dashboard open increments an aggregate row in
+`DiseaseRegistry_Model.DashboardUsage`. The hook stores only the dashboard name,
+open count, and first/last timestamps; it does not store users, URLs, filter
+values, parameters, or query text. If another dashboard audit command is already
+configured, installation prepends the usage recorder and retains that command.
+
+Warming order is determined without a hand-maintained priority list:
+
+1. Higher recorded dashboard open count.
+2. IRIS BI's built-in dashboard `lastAccessed` timestamp when counts are tied or
+   no usage row exists.
+3. Dashboard name for a deterministic final tie-breaker.
+
+Saved pivots inherit the earliest priority of any dashboard widget that uses
+them. Pivots not referenced by a dashboard still run, after prioritized pivots.
+The access hook is intentionally small and uses a zero-wait lock: if two opens
+for the same dashboard collide, one usage increment may be skipped rather than
+delaying the dashboard.
+
+Inspect the automatically collected rankings with SQL:
+
+```sql
+SELECT DashboardName, OpenCount, FirstOpenedAt, LastOpenedAt
+FROM DiseaseRegistry_Model.DashboardUsage
+ORDER BY OpenCount DESC, LastOpenedAt DESC
+```
 
 Dashboard URL filters, interactive selections, and per-user saved dashboard
 overrides are not predictable and are not warmed automatically. Add explicit
@@ -158,7 +189,9 @@ names, source type, dashboard/widget attribution, default-filter count,
 generated query keys, row and column counts, timings, and status. MDX text,
 parameter values, and filter values are deliberately not stored. Synchronous
 warmer methods also return the persistent run ID in `stats("runId")`; cube runs
-return the number of filtered dashboard queries in `stats("dashboardDefaults")`.
+return the number of dashboard-attributed base queries in
+`stats("dashboardBaseQueries")` and filtered dashboard queries in
+`stats("dashboardDefaults")`.
 
 Inspect recent runs with SQL:
 
@@ -173,7 +206,8 @@ Inspect the queries belonging to a run by substituting its ID:
 
 ```sql
 SELECT QueryName, SourceType, DashboardName, WidgetName, DefaultFilterCount,
-       CubeName, QueryKey, RowCount, ColumnCount, ElapsedSeconds,
+       DashboardOpenCount, PriorityOrder, CubeName, QueryKey,
+       RowCount, ColumnCount, ElapsedSeconds,
        Success, StatusText
 FROM DiseaseRegistry_Model.CacheWarmQuery
 WHERE Run = 2

@@ -69,6 +69,34 @@ Method TestDashboardDefaultFilterComposition()
   Do $$$AssertTrue(filteredMDX["%OR({[Emirate].[H1].[Emirate].&[Dubai],[Emirate].[H1].[Emirate].&[Ajman]})")
 }
 
+Method TestDashboardUsageAuditHook()
+{
+  Set dashboardName = "Disease Registry/Cache Warmer Usage Test.dashboard"
+  If ##class(DiseaseRegistry.Model.DashboardUsage).%ExistsId(dashboardName) {
+    Set cleanupSC = ##class(DiseaseRegistry.Model.DashboardUsage).%DeleteId(dashboardName)
+    Do $$$AssertStatusOK(cleanupSC)
+  }
+
+  Set sc = ##class(DiseaseRegistry.Util.DashboardUsage).Install(.changed)
+  Do $$$AssertStatusOK(sc)
+  Do $$$AssertTrue(^DeepSee.AuditCode[$Parameter("DiseaseRegistry.Util.DashboardUsage","AUDITCOMMAND"))
+
+  Set sc = ##class(%DeepSee.Utils).%RunServerAuditCode(dashboardName)
+  Do $$$AssertStatusOK(sc)
+  Set sc = ##class(%DeepSee.Utils).%RunServerAuditCode(dashboardName)
+  Do $$$AssertStatusOK(sc)
+  Do $$$AssertEquals(##class(DiseaseRegistry.Util.DashboardUsage).GetOpenCount(dashboardName),2)
+
+  Set usage = ##class(DiseaseRegistry.Model.DashboardUsage).%OpenId(dashboardName,,.openSC)
+  Do $$$AssertStatusOK(openSC)
+  Do $$$AssertTrue($IsObject(usage))
+  Do $$$AssertNotEquals(usage.FirstOpenedAt,"")
+  Do $$$AssertNotEquals(usage.LastOpenedAt,"")
+
+  Set cleanupSC = ##class(DiseaseRegistry.Model.DashboardUsage).%DeleteId(dashboardName)
+  Do $$$AssertStatusOK(cleanupSC)
+}
+
 Method TestCacheWarmStatsArePersistent()
 {
   Kill parameters,stats
@@ -88,6 +116,8 @@ Method TestCacheWarmStatsArePersistent()
   Set query = run.Queries.GetAt(1)
   Do $$$AssertEquals(query.SourceType,"AdHocMDX")
   Do $$$AssertEquals(query.DefaultFilterCount,0)
+  Do $$$AssertEquals(query.DashboardOpenCount,0)
+  Do $$$AssertEquals(query.PriorityOrder,0)
 
   Set deleteSC = ##class(DiseaseRegistry.Model.CacheWarmRun).%DeleteId(runId)
   Do $$$AssertStatusOK(deleteSC)

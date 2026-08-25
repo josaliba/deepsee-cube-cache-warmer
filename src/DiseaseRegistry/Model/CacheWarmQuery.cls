@@ -7,7 +7,7 @@ Relationship Run As DiseaseRegistry.Model.CacheWarmRun [ Cardinality = parent, I
 /// Saved pivot name, or "Ad hoc MDX" for a direct MDX invocation.
 Property QueryName As %String(MAXLEN = 512);
 
-/// BasePivot, DashboardDefault, Pivot, or AdHocMDX.
+/// BasePivot, DashboardBase, DashboardDefault, Pivot, or AdHocMDX.
 Property SourceType As %String(MAXLEN = 32);
 
 /// Dashboard and widget attribution for a DashboardDefault query.
@@ -17,6 +17,12 @@ Property WidgetName As %String(MAXLEN = 255);
 
 /// Number of default filters applied. Filter values are not persisted.
 Property DefaultFilterCount As %Integer [ InitialExpression = 0 ];
+
+/// Dashboard-open count observed when this query was prioritized.
+Property DashboardOpenCount As %Integer [ InitialExpression = 0 ];
+
+/// Dashboard popularity rank used for this query; zero means unranked.
+Property PriorityOrder As %Integer [ InitialExpression = 0 ];
 
 Property CubeName As %String(MAXLEN = 128);
 
@@ -75,6 +81,12 @@ Storage Default
 </Value>
 <Value name="13">
 <Value>DefaultFilterCount</Value>
+</Value>
+<Value name="14">
+<Value>DashboardOpenCount</Value>
+</Value>
+<Value name="15">
+<Value>PriorityOrder</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Queries")</DataLocation>

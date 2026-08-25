@@ -45,6 +45,9 @@ ClassMethod Bootstrap() As %Status
   If '$SYSTEM.Status.IsError(sc) {
     Set sc = ##class(%DeepSee.CubeManager.Utils).ScheduleUpdaterTasks()
   }
+  If '$SYSTEM.Status.IsError(sc) {
+    Set sc = ##class(DiseaseRegistry.Util.DashboardUsage).Install()
+  }
   Set $Namespace = previousNamespace
 
   Quit sc
