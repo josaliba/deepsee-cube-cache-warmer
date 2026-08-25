@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="iris-bi-cache-warmer.ZPM">
+    <Module>
+      <Name>iris-bi-cache-warmer</Name>
+      <Description>Popularity-aware cache warming for InterSystems IRIS Business Intelligence cubes and dashboards.</Description>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="CubeCacheWarmer.PKG"/>
+      <SystemRequirements Version=">=2021.1"/>
+      <Invoke Class="CubeCacheWarmer.Installer" Method="Install" Phase="Activate" When="After"/>
+      <Invoke Class="CubeCacheWarmer.Installer" Method="Uninstall" Phase="Clean" When="Before"/>
+    </Module>
+  </Document>
+</Export>

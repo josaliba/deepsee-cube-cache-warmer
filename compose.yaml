@@ -45,6 +45,7 @@ services:
       - ./license/iris.key:/license/iris.key:ro
       - ./src:/workspace/src:ro
       - ./tests:/workspace/tests:ro
+      - ./packages:/workspace/packages:ro
 
   webgateway:
     image: ${WEBGATEWAY_IMAGE:-containers.intersystems.com/intersystems/webgateway:latest-em}

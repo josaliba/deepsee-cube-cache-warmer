@@ -1,6 +1,6 @@
 /// Aggregate dashboard-open statistics used to prioritize cache warming.
 /// No user identifiers, URL parameters, filter values, or query text are stored.
-Class DiseaseRegistry.Model.DashboardUsage Extends (%Persistent, %JSON.Adaptor)
+Class CubeCacheWarmer.Model.DashboardUsage Extends (%Persistent, %JSON.Adaptor)
 {
 
 Property DashboardName As %String(MAXLEN = 512) [ Required ];
@@ -31,11 +31,11 @@ Storage Default
 <Value>LastOpenedAt</Value>
 </Value>
 </Data>
-<DataLocation>^DiseaseRegi971A.DashboardUsageD</DataLocation>
+<DataLocation>^CubeCacheWarmer.DashboardUsageD</DataLocation>
 <DefaultData>DashboardUsageDefaultData</DefaultData>
-<IdLocation>^DiseaseRegi971A.DashboardUsageD</IdLocation>
-<IndexLocation>^DiseaseRegi971A.DashboardUsageI</IndexLocation>
-<StreamLocation>^DiseaseRegi971A.DashboardUsageS</StreamLocation>
+<IdLocation>^CubeCacheWarmer.DashboardUsageD</IdLocation>
+<IndexLocation>^CubeCacheWarmer.DashboardUsageI</IndexLocation>
+<StreamLocation>^CubeCacheWarmer.DashboardUsageS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

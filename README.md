@@ -1,6 +1,6 @@
 # DHA Disease Registry
 
-Local development scaffold for a disease registry on licensed InterSystems IRIS for Health. Docker Compose starts IRIS for Health and a matching Web Gateway, creates the interoperability-enabled `DISEASEREGISTRY` namespace and database, and imports all ObjectScript classes under `src/`. Interoperability enablement supplies the mappings and portal registration required for Analytics.
+Local development scaffold for a disease registry on licensed InterSystems IRIS for Health. Docker Compose starts IRIS for Health and a matching Web Gateway, creates the interoperability-enabled `DISEASEREGISTRY` namespace and database, and imports the standalone cache-warmer package followed by the application classes under `src/`. Interoperability enablement supplies the mappings and portal registration required for Analytics.
 
 Bootstrap also upgrades an existing `DISEASEREGISTRY` volume that was created
 without interoperability support; deleting the Docker volume is not required.
@@ -41,7 +41,9 @@ The local development credentials are `_SYSTEM` / `SYS`. Bootstrap clears the fi
 
 - Put ObjectScript classes in `src/<package path>/ClassName.cls`.
 - Put unit tests in `tests/<package path>/TestName.cls`.
-- The container imports `src/` each time it starts.
+- Reusable cache-warmer code and tests live under
+  `packages/iris-bi-cache-warmer/` rather than the application source tree.
+- The container imports the cache-warmer package and `src/` each time it starts.
 - With the ObjectScript extension connected, saving a `.cls` file compiles it directly into `DISEASEREGISTRY`.
 - Run the smoke test with `./bin/test`.
 
@@ -52,6 +54,7 @@ Useful commands:
 ./bin/logs        # Follow IRIS logs
 ./bin/terminal    # Open an ObjectScript shell in DISEASEREGISTRY
 ./bin/test        # Import and run tests
+./bin/package-cache-warmer  # Build a distributable package archive
 ./bin/stop        # Stop the container, preserving data
 docker compose down -v  # Delete the container AND all local IRIS data
 ```
@@ -114,6 +117,19 @@ You can inspect `^OBJ.DSTIME` between the two calls to see the pending source ID
 
 ### Configure automatic cache warming
 
+The application-neutral implementation is isolated in
+[`packages/iris-bi-cache-warmer`](packages/iris-bi-cache-warmer/README.md). That
+directory contains the `.cls` sources, tests, documentation, installer, and IPM
+`module.xml`; it can be copied into another repository without the Disease
+Registry demo. Run `./bin/package-cache-warmer` to create a versioned archive
+under the ignored `dist/` directory.
+
+On an existing development volume, bootstrap removes the former
+`DiseaseRegistry.Util.DashboardUsage` audit command before installing the new
+package hook. Legacy compiled classes and their old statistics may remain in the
+volume, but they are no longer called or included in source control; export any
+legacy history you need before deleting those definitions manually.
+
 The generated `DiseaseRegistry.CubeRegistry` is activated during bootstrap. It
 registers each cube in an enabled Cube Manager schedule group that runs every
 five minutes. Since both cubes support synchronization, routine updates use
@@ -128,11 +144,11 @@ The included registry uses the following Post-Build Code and Post-Synchronize
 Code for each cube:
 
 ```objectscript
-do ##class(DiseaseRegistry.Util.CacheWarmer).QueueCube("DiseaseRegistryPatients")
+do ##class(CubeCacheWarmer.CacheWarmer).QueueCube("DiseaseRegistryPatients")
 ```
 
 ```objectscript
-do ##class(DiseaseRegistry.Util.CacheWarmer).QueueCube("DiseaseRegistryDiagnoses")
+do ##class(CubeCacheWarmer.CacheWarmer).QueueCube("DiseaseRegistryDiagnoses")
 ```
 
 The warmer runs as a background job, waits until the cube is queryable, and
@@ -146,12 +162,12 @@ dashboard opens. Static values and `@` runtime settings are supported; runtime
 settings are evaluated in the worker's user/security context. Keeping the query
 workload in a separate process prevents slow MDX queries from extending the Cube
 Manager task. Summary outcomes are written to
-`DeepSeeTasks_DISEASEREGISTRY.log` with source label `DiseaseReg`.
+`DeepSeeTasks_DISEASEREGISTRY.log` with source label `CubeCache`.
 
 Bootstrap installs IRIS BI's documented [`^DeepSee.AuditCode` dashboard-access
 hook](https://docs.intersystems.com/irisforhealthlatest/csp/docbook/DocBook.UI.Page.cls?KEY=D2IMP_ch_dev).
 Each dashboard open increments an aggregate row in
-`DiseaseRegistry_Model.DashboardUsage`. The hook stores only the dashboard name,
+`CubeCacheWarmer_Model.DashboardUsage`. The hook stores only the dashboard name,
 open count, and first/last timestamps; it does not store users, URLs, filter
 values, parameters, or query text. If another dashboard audit command is already
 configured, installation prepends the usage recorder and retains that command.
@@ -173,7 +189,7 @@ Inspect the automatically collected rankings with SQL:
 
 ```sql
 SELECT DashboardName, OpenCount, FirstOpenedAt, LastOpenedAt
-FROM DiseaseRegistry_Model.DashboardUsage
+FROM CubeCacheWarmer_Model.DashboardUsage
 ORDER BY OpenCount DESC, LastOpenedAt DESC
 ```
 
@@ -183,8 +199,8 @@ warming profiles for high-value combinations that differ from the saved opening
 defaults.
 
 Every queued, cube, pivot, and direct-MDX warming invocation also writes
-persistent history to `DiseaseRegistry_Model.CacheWarmRun`, with one child row
-per query in `DiseaseRegistry_Model.CacheWarmQuery`. The history contains query
+persistent history to `CubeCacheWarmer_Model.CacheWarmRun`, with one child row
+per query in `CubeCacheWarmer_Model.CacheWarmQuery`. The history contains query
 names, source type, dashboard/widget attribution, default-filter count,
 generated query keys, row and column counts, timings, and status. MDX text,
 parameter values, and filter values are deliberately not stored. Synchronous
@@ -198,7 +214,7 @@ Inspect recent runs with SQL:
 ```sql
 SELECT TOP 20 %ID, CubeName, Mode, Outcome, StartedAt, FinishedAt,
        TotalQueries, SucceededQueries, FailedQueries, ElapsedSeconds, StatusText
-FROM DiseaseRegistry_Model.CacheWarmRun
+FROM CubeCacheWarmer_Model.CacheWarmRun
 ORDER BY %ID DESC
 ```
 
@@ -209,14 +225,14 @@ SELECT QueryName, SourceType, DashboardName, WidgetName, DefaultFilterCount,
        DashboardOpenCount, PriorityOrder, CubeName, QueryKey,
        RowCount, ColumnCount, ElapsedSeconds,
        Success, StatusText
-FROM DiseaseRegistry_Model.CacheWarmQuery
+FROM CubeCacheWarmer_Model.CacheWarmQuery
 WHERE Run = 2
 ```
 
 History is not deleted automatically. To retain the most recent 30 days:
 
 ```objectscript
-set sc=##class(DiseaseRegistry.Util.CacheWarmer).PurgeHistory(30,.deleted)
+set sc=##class(CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
 do $SYSTEM.OBJ.DisplayError(sc)
 write !,"Deleted runs: ",deleted,!
 ```
@@ -225,7 +241,7 @@ To execute an important MDX query that is not saved as a pivot:
 
 ```objectscript
 set mdx="SELECT {[Measures].[%Count]} ON 0, [Disease].[Disease Group].Members ON 1 FROM [DiseaseRegistryDiagnoses]"
-set sc=##class(DiseaseRegistry.Util.CacheWarmer).WarmMDX(mdx,.parameters,1,.stats)
+set sc=##class(CubeCacheWarmer.CacheWarmer).WarmMDX(mdx,.parameters,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 zwrite stats
 ```
@@ -235,7 +251,7 @@ high-value dashboard queries and parameter combinations.
 
 ## Persistence and code injection
 
-IRIS instance data and the application database live in the Docker named volume `disease-registry-iris-data`; Web Gateway state uses `disease-registry-webgateway-data`. The license is mounted read-only and excluded from Git. The `src/` and `tests/` directories are mounted read-only into the running container. The image also contains a snapshot of both directories, so it remains runnable without the development bind mounts if Compose is adjusted later.
+IRIS instance data and the application database live in the Docker named volume `disease-registry-iris-data`; Web Gateway state uses `disease-registry-webgateway-data`. The license is mounted read-only and excluded from Git. The `packages/`, `src/`, and `tests/` directories are mounted read-only into the running container. The image also contains a snapshot of those directories, so it remains runnable without the development bind mounts if Compose is adjusted later.
 
 The bootstrap flow is:
 
@@ -243,7 +259,8 @@ The bootstrap flow is:
 2. IRIS starts using durable `%SYS` at `/durable/config`.
 3. `iris-main --after` executes `docker/bootstrap.sh`.
 4. `docker/App.Installer.cls` creates the database and namespace when absent.
-5. The installer recursively imports and compiles `src/`.
+5. The installer imports `packages/iris-bi-cache-warmer/src/`, installs its BI
+   audit hook, and then imports the Disease Registry classes under `src/`.
 
 Before starting, `bin/start` also verifies that the configured SuperServer and Web Gateway host ports are not already occupied by another process.
 

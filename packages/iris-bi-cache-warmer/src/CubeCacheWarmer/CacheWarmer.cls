@@ -3,7 +3,7 @@ Include %occStatus
 /// Warms IRIS Business Intelligence caches after a cube build or synchronization.
 /// Saved pivots and their dashboard default-filter variants are executed through
 /// the standard cache-enabled %DeepSee.ResultSet API.
-Class DiseaseRegistry.Util.CacheWarmer Extends %RegisteredObject
+Class CubeCacheWarmer.CacheWarmer Extends %RegisteredObject
 {
 
 /// Queue warming in a background process. Use this from Cube Manager Post-Build
@@ -14,7 +14,7 @@ ClassMethod QueueCube(pCubeName As %String, pWaitSeconds As %Integer = 600, pVer
   If pCubeName = "" Quit $$$ERROR($$$GeneralError,"A cube name is required")
   If pWaitSeconds < 0 Quit $$$ERROR($$$GeneralError,"pWaitSeconds cannot be negative")
 
-  Job ##class(DiseaseRegistry.Util.CacheWarmer).WarmWhenAvailable(pCubeName,pWaitSeconds,pVerbose,pStopOnError)
+  Job ##class(CubeCacheWarmer.CacheWarmer).WarmWhenAvailable(pCubeName,pWaitSeconds,pVerbose,pStopOnError)
   Set pJobId = $ZCHILD
   If 'pJobId Quit $$$ERROR($$$GeneralError,"Unable to start a cache warming job for "_pCubeName)
   If pVerbose Write !,"Queued cache warming for [",pCubeName,"] as job ",pJobId,!
@@ -29,7 +29,7 @@ ClassMethod WarmWhenAvailable(pCubeName As %String, pWaitSeconds As %Integer = 6
   If $$$ISERR(tHistorySC) Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
 
   Set tKey = $ZCONVERT(pCubeName,"U")
-  Lock +^DiseaseRegistry.CacheWarmer("cube",tKey):0
+  Lock +^CubeCacheWarmer.CacheWarmerLock("cube",tKey):0
   If '$TEST {
     Do ..InitializeStats(pCubeName,.tStats)
     Set tStats("finished") = ..CurrentTimestamp()
@@ -73,7 +73,7 @@ ClassMethod WarmWhenAvailable(pCubeName As %String, pWaitSeconds As %Integer = 6
     If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
   }
 
-  Lock -^DiseaseRegistry.CacheWarmer("cube",tKey)
+  Lock -^CubeCacheWarmer.CacheWarmerLock("cube",tKey)
   If $$$ISERR(tSC) {
     Do ..Log("Cache warming failed for "_pCubeName_": "_$System.Status.GetErrorText(tSC))
   } Else {
@@ -136,8 +136,8 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
       Quit
     }
 
-    &sql(DECLARE DiseaseRegistryWarmPivots CURSOR FOR SELECT %ID FROM %DeepSee_Dashboard.Pivot)
-    &sql(OPEN DiseaseRegistryWarmPivots)
+    &sql(DECLARE CubeCacheWarmerPivots CURSOR FOR SELECT %ID FROM %DeepSee_Dashboard.Pivot)
+    &sql(OPEN CubeCacheWarmerPivots)
     If SQLCODE < 0 {
       Set tSC = $$$ERROR($$$GeneralError,"Unable to enumerate saved pivots. SQLCODE="_SQLCODE_" "_$Get(%msg))
       Quit
@@ -145,7 +145,7 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
     Set tCursorOpen = 1
 
     For {
-      &sql(FETCH DiseaseRegistryWarmPivots INTO :tPivotId)
+      &sql(FETCH CubeCacheWarmerPivots INTO :tPivotId)
       Quit:SQLCODE'=0
 
       Set tOpenSC = $$$OK
@@ -176,7 +176,7 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
     }
 
     If tCursorOpen {
-      &sql(CLOSE DiseaseRegistryWarmPivots)
+      &sql(CLOSE CubeCacheWarmerPivots)
       Set tCursorOpen = 0
     }
 
@@ -230,7 +230,7 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
   }
 
   If tCursorOpen {
-    &sql(CLOSE DiseaseRegistryWarmPivots)
+    &sql(CLOSE CubeCacheWarmerPivots)
   }
   Set pStats("finished") = ..CurrentTimestamp()
   Set pStats("elapsedTime") = $ZH-tStart
@@ -394,17 +394,17 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
   Set tCursorOpen = 0
   Set tDashboardRank = 0
 
-  &sql(DECLARE DiseaseRegistryWarmDashboards CURSOR FOR
+  &sql(DECLARE CubeCacheWarmerDashboards CURSOR FOR
     SELECT d.%ID, COALESCE(u.OpenCount,0)
     FROM %DeepSee_Dashboard.Definition d
-    LEFT JOIN DiseaseRegistry_Model.DashboardUsage u ON u.DashboardName = d.fullName
+    LEFT JOIN CubeCacheWarmer_Model.DashboardUsage u ON u.DashboardName = d.fullName
     ORDER BY COALESCE(u.OpenCount,0) DESC, d.lastAccessed DESC, d.fullName)
-  &sql(OPEN DiseaseRegistryWarmDashboards)
+  &sql(OPEN CubeCacheWarmerDashboards)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate dashboards. SQLCODE="_SQLCODE_" "_$Get(%msg))
   Set tCursorOpen = 1
 
   For {
-    &sql(FETCH DiseaseRegistryWarmDashboards INTO :tDashboardId,:tDashboardOpenCount)
+    &sql(FETCH CubeCacheWarmerDashboards INTO :tDashboardId,:tDashboardOpenCount)
     Quit:SQLCODE'=0
     Set tDashboardRank = tDashboardRank+1
     If tDashboardOpenCount>0 Set pStats("priorityDashboards") = pStats("priorityDashboards")+1
@@ -582,7 +582,7 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
 
   Set tFetchCode = SQLCODE
   If tCursorOpen {
-    &sql(CLOSE DiseaseRegistryWarmDashboards)
+    &sql(CLOSE CubeCacheWarmerDashboards)
   }
   If ('pStopped),(tFetchCode<0) Quit $$$ERROR($$$GeneralError,"Error while enumerating dashboards. SQLCODE="_tFetchCode_" "_$Get(%msg))
   Quit tOverallSC
@@ -663,23 +663,23 @@ ClassMethod PurgeHistory(pDaysToKeep As %Integer = 30, Output pDeleted As %Integ
   Set tSC = $$$OK
   Set tCursorOpen = 0
 
-  &sql(DECLARE DiseaseRegistryOldWarmRuns CURSOR FOR
-    SELECT %ID FROM DiseaseRegistry_Model.CacheWarmRun
+  &sql(DECLARE CubeCacheWarmerOldRuns CURSOR FOR
+    SELECT %ID FROM CubeCacheWarmer_Model.CacheWarmRun
     WHERE StartedAt < :tCutoff AND Outcome <> 'Running')
-  &sql(OPEN DiseaseRegistryOldWarmRuns)
+  &sql(OPEN CubeCacheWarmerOldRuns)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate cache-warming history. SQLCODE="_SQLCODE_" "_$Get(%msg))
   Set tCursorOpen = 1
 
   For {
-    &sql(FETCH DiseaseRegistryOldWarmRuns INTO :tRunId)
+    &sql(FETCH CubeCacheWarmerOldRuns INTO :tRunId)
     Quit:SQLCODE'=0
-    Set tSC = ##class(DiseaseRegistry.Model.CacheWarmRun).%DeleteId(tRunId)
+    Set tSC = ##class(CubeCacheWarmer.Model.CacheWarmRun).%DeleteId(tRunId)
     Quit:$$$ISERR(tSC)
     Set pDeleted = pDeleted+1
   }
   Set tFetchCode = SQLCODE
   If tCursorOpen {
-    &sql(CLOSE DiseaseRegistryOldWarmRuns)
+    &sql(CLOSE CubeCacheWarmerOldRuns)
   }
   If $$$ISERR(tSC) Quit tSC
   If tFetchCode < 0 Quit $$$ERROR($$$GeneralError,"Unable to fetch cache-warming history. SQLCODE="_tFetchCode_" "_$Get(%msg))
@@ -705,7 +705,7 @@ ClassMethod InitializeStats(pCubeName As %String, Output pStats) [ Private ]
 ClassMethod StartRun(pCubeName As %String, pMode As %String, Output pRunId As %Integer) As %Status [ Private ]
 {
   Set pRunId = 0
-  Set tRun = ##class(DiseaseRegistry.Model.CacheWarmRun).%New()
+  Set tRun = ##class(CubeCacheWarmer.Model.CacheWarmRun).%New()
   Set tRun.CubeName = $Extract(pCubeName,1,128)
   Set tRun.Mode = $Extract(pMode,1,32)
   Set tRun.Outcome = "Running"
@@ -719,7 +719,7 @@ ClassMethod StartRun(pCubeName As %String, pMode As %String, Output pRunId As %I
 ClassMethod UpdateRunCube(pRunId As %Integer, pCubeName As %String) As %Status [ Private ]
 {
   If pRunId < 1 Quit $$$OK
-  Set tRun = ##class(DiseaseRegistry.Model.CacheWarmRun).%OpenId(pRunId,,.tSC)
+  Set tRun = ##class(CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tSC)
   If $$$ISERR(tSC) Quit tSC
   If '$IsObject(tRun) Quit $$$ERROR($$$GeneralError,"Cache-warming run not found: "_pRunId)
   Set tRun.CubeName = $Extract(pCubeName,1,128)
@@ -729,11 +729,11 @@ ClassMethod UpdateRunCube(pRunId As %Integer, pCubeName As %String) As %Status [
 ClassMethod SaveQuery(pRunId As %Integer, pQueryName As %String, ByRef pStats, pSC As %Status, pSourceType As %String = "AdHocMDX", pDashboardName As %String = "", pWidgetName As %String = "", pDefaultFilterCount As %Integer = 0, pDashboardOpenCount As %Integer = 0, pPriorityOrder As %Integer = 0) As %Status [ Private ]
 {
   If pRunId < 1 Quit $$$OK
-  Set tRun = ##class(DiseaseRegistry.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
+  Set tRun = ##class(CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
   If $$$ISERR(tOpenSC) Quit tOpenSC
   If '$IsObject(tRun) Quit $$$ERROR($$$GeneralError,"Cache-warming run not found: "_pRunId)
 
-  Set tQuery = ##class(DiseaseRegistry.Model.CacheWarmQuery).%New()
+  Set tQuery = ##class(CubeCacheWarmer.Model.CacheWarmQuery).%New()
   Set tQuery.Run = tRun
   Set tQuery.QueryName = $Extract(pQueryName,1,512)
   Set tQuery.SourceType = $Extract(pSourceType,1,32)
@@ -755,7 +755,7 @@ ClassMethod SaveQuery(pRunId As %Integer, pQueryName As %String, ByRef pStats, p
 ClassMethod FinishRun(pRunId As %Integer, ByRef pStats, pSC As %Status, pOutcome As %String = "", pStatusText As %String = "") As %Status [ Private ]
 {
   If pRunId < 1 Quit $$$OK
-  Set tRun = ##class(DiseaseRegistry.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
+  Set tRun = ##class(CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
   If $$$ISERR(tOpenSC) Quit tOpenSC
   If '$IsObject(tRun) Quit $$$ERROR($$$GeneralError,"Cache-warming run not found: "_pRunId)
 
@@ -782,7 +782,7 @@ ClassMethod CurrentTimestamp() As %TimeStamp [ Private ]
 
 ClassMethod Log(pMessage As %String) As %Status [ Private ]
 {
-  Quit ##class(%DeepSee.Utils).%WriteToLog("DiseaseReg",pMessage)
+  Quit ##class(%DeepSee.Utils).%WriteToLog("CubeCache",pMessage)
 }
 
 }

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+package_name="iris-bi-cache-warmer"
+package_dir="${project_root}/packages/${package_name}"
+package_version="$(sed -n 's:.*<Version>\([^<]*\)</Version>.*:\1:p' "${package_dir}/module.xml" | head -n 1)"
+archive_dir="${project_root}/dist"
+archive_path="${archive_dir}/${package_name}-${package_version}.tar.gz"
+
+mkdir -p "${archive_dir}"
+tar -czf "${archive_path}" -C "${project_root}/packages" "${package_name}"
+printf '%s\n' "${archive_path}"

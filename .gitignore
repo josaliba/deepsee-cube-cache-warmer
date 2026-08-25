@@ -5,6 +5,7 @@
 .vscode/*.log
 data/*
 !data/.gitkeep
+dist/
 license/*
 !license/README.md
 *.log
