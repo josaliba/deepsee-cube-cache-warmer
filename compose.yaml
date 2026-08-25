@@ -1,6 +1,19 @@
 name: disease-registry
 
 services:
+  iris-volume-init:
+    image: disease-registry-iris:dev
+    container_name: disease-registry-iris-volume-init
+    user: "0:0"
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - mkdir -p /durable/config /durable/databases && chown -R 51773:51773 /durable
+    restart: "no"
+    volumes:
+      - iris-data:/durable
+
   iris:
     build:
       context: .
@@ -12,6 +25,9 @@ services:
     hostname: disease-registry
     init: true
     restart: unless-stopped
+    depends_on:
+      iris-volume-init:
+        condition: service_completed_successfully
     command:
       - --key
       - /license/iris.key
@@ -37,7 +53,8 @@ services:
     init: true
     restart: unless-stopped
     depends_on:
-      - iris
+      iris:
+        condition: service_started
     environment:
       ISC_DATA_DIRECTORY: /durable
       ISC_CSP_INI_FILE: /config/CSP.ini

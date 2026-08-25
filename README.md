@@ -59,10 +59,13 @@ IRIS instance data and the application database live in the Docker named volume 
 
 The bootstrap flow is:
 
-1. IRIS starts using durable `%SYS` at `/durable/config`.
-2. `iris-main --after` executes `docker/bootstrap.sh`.
-3. `docker/App.Installer.cls` creates the database and namespace when absent.
-4. The installer recursively imports and compiles `src/`.
+1. A one-shot initializer makes the named volume writable by the IRIS container user (UID `51773`).
+2. IRIS starts using durable `%SYS` at `/durable/config`.
+3. `iris-main --after` executes `docker/bootstrap.sh`.
+4. `docker/App.Installer.cls` creates the database and namespace when absent.
+5. The installer recursively imports and compiles `src/`.
+
+Before starting, `bin/start` also verifies that the configured SuperServer and Web Gateway host ports are not already occupied by another process.
 
 ## Configuration
 

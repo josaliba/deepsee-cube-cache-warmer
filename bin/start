@@ -6,5 +6,31 @@ if [[ ! -f license/iris.key ]]; then
   exit 1
 fi
 
+compose_config="$(docker compose config --format json)"
+iris_port="$(python3 -c 'import json,sys; c=json.load(sys.stdin); print(c["services"]["iris"]["ports"][0]["published"])' <<<"${compose_config}")"
+web_port="$(python3 -c 'import json,sys; c=json.load(sys.stdin); print(c["services"]["webgateway"]["ports"][0]["published"])' <<<"${compose_config}")"
+
+service_is_running() {
+  docker compose ps --services --filter status=running | grep -Fxq "$1"
+}
+
+check_port() {
+  local port="$1"
+  local service="$2"
+
+  if service_is_running "${service}"; then
+    return
+  fi
+
+  if lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "Port ${port}, required by ${service}, is already in use:" >&2
+    lsof -nP -iTCP:"${port}" -sTCP:LISTEN >&2
+    exit 1
+  fi
+}
+
+check_port "${iris_port}" iris
+check_port "${web_port}" webgateway
+
 docker compose up --build -d
 docker compose ps

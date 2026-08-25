@@ -21,5 +21,20 @@ ClassMethod Setup(ByRef pVars, pLogLevel As %Integer = 3, pInstaller As %Install
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "Setup")
 }
 
+/// Create the application namespace once, then import current source on every start.
+ClassMethod Bootstrap() As %Status
+{
+  If '##class(%SYS.Namespace).Exists("DISEASEREGISTRY") {
+    Set sc = ..Setup()
+    If $SYSTEM.Status.IsError(sc) Quit sc
+  }
+
+  Set previousNamespace = $Namespace
+  Set $Namespace = "DISEASEREGISTRY"
+  Set sc = $SYSTEM.OBJ.LoadDir("/workspace/src", "ck", , 1)
+  Set $Namespace = previousNamespace
+
+  Quit sc
 }
 
+}
