@@ -89,6 +89,10 @@ The saved pivots are created under the BI user-library folder `Disease Registry`
 - `Patients by Status.pivot`
 - `Diagnoses by Group.pivot`
 
+The setup also creates `Patient Overview.dashboard`. Its patient-status widget
+opens with two filters: the runtime setting `@DiseaseRegistryDefaultStatus`
+(which resolves to Active) and the static default Emirate=Dubai.
+
 ### Exercise cube synchronization
 
 Generate patient and diagnosis changes:
@@ -132,9 +136,56 @@ do ##class(DiseaseRegistry.Util.CacheWarmer).QueueCube("DiseaseRegistryDiagnoses
 ```
 
 The warmer runs as a background job, waits until the cube is queryable, and
-coalesces duplicate workers for the same cube. This ensures it runs after the
-build's final obsolete-cache purge. Outcomes are written to
+coalesces duplicate workers for the same cube. It warms every matching saved
+pivot and then discovers pivot widgets on saved dashboards. For each widget it
+combines the widget's saved filter state and applicable `applyFilter` or
+`setFilter` control defaults into the same filtered MDX shape used when the
+dashboard opens. Static values and `@` runtime settings are supported; runtime
+settings are evaluated in the worker's user/security context. Keeping the query
+workload in a separate process prevents slow MDX queries from extending the Cube
+Manager task. Summary outcomes are written to
 `DeepSeeTasks_DISEASEREGISTRY.log` with source label `DiseaseReg`.
+
+Dashboard URL filters, interactive selections, and per-user saved dashboard
+overrides are not predictable and are not warmed automatically. Add explicit
+warming profiles for high-value combinations that differ from the saved opening
+defaults.
+
+Every queued, cube, pivot, and direct-MDX warming invocation also writes
+persistent history to `DiseaseRegistry_Model.CacheWarmRun`, with one child row
+per query in `DiseaseRegistry_Model.CacheWarmQuery`. The history contains query
+names, source type, dashboard/widget attribution, default-filter count,
+generated query keys, row and column counts, timings, and status. MDX text,
+parameter values, and filter values are deliberately not stored. Synchronous
+warmer methods also return the persistent run ID in `stats("runId")`; cube runs
+return the number of filtered dashboard queries in `stats("dashboardDefaults")`.
+
+Inspect recent runs with SQL:
+
+```sql
+SELECT TOP 20 %ID, CubeName, Mode, Outcome, StartedAt, FinishedAt,
+       TotalQueries, SucceededQueries, FailedQueries, ElapsedSeconds, StatusText
+FROM DiseaseRegistry_Model.CacheWarmRun
+ORDER BY %ID DESC
+```
+
+Inspect the queries belonging to a run by substituting its ID:
+
+```sql
+SELECT QueryName, SourceType, DashboardName, WidgetName, DefaultFilterCount,
+       CubeName, QueryKey, RowCount, ColumnCount, ElapsedSeconds,
+       Success, StatusText
+FROM DiseaseRegistry_Model.CacheWarmQuery
+WHERE Run = 2
+```
+
+History is not deleted automatically. To retain the most recent 30 days:
+
+```objectscript
+set sc=##class(DiseaseRegistry.Util.CacheWarmer).PurgeHistory(30,.deleted)
+do $SYSTEM.OBJ.DisplayError(sc)
+write !,"Deleted runs: ",deleted,!
+```
 
 To execute an important MDX query that is not saved as a pivot:
 

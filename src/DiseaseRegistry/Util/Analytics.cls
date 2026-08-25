@@ -5,7 +5,7 @@ Class DiseaseRegistry.Util.Analytics Extends %RegisteredObject
 {
 
 /// Reset only demo model extents, generate deterministic data, build the cubes,
-/// create saved pivots, and optionally warm their queries.
+/// create saved pivots and a dashboard with defaults, and optionally warm them.
 ClassMethod SetupDemo(pPatientCount As %Integer = 50, pDiagnosisCount As %Integer = 500, pReset As %Boolean = 1, pWarm As %Boolean = 1) As %Status
 {
   If pPatientCount < 1 Quit $$$ERROR($$$GeneralError,"pPatientCount must be positive")
@@ -33,6 +33,8 @@ ClassMethod SetupDemo(pPatientCount As %Integer = 50, pDiagnosisCount As %Intege
   Set tSC = ..BuildAll()
   If $$$ISERR(tSC) Quit tSC
   Set tSC = ..CreateDemoPivots()
+  If $$$ISERR(tSC) Quit tSC
+  Set tSC = ..CreateDemoDashboard()
   If $$$ISERR(tSC) Quit tSC
   If pWarm {
     Set tSC = ..WarmAll()
@@ -260,6 +262,61 @@ ClassMethod CreateDemoPivots() As %Status
   If $$$ISERR(tSC) Quit tSC
   Set tMDX = "SELECT {[Measures].[%Count],[Measures].[Notifiable Cases]} ON 0, NON EMPTY [Disease].[Disease Group].Members ON 1 FROM [DiseaseRegistryDiagnoses]"
   Quit ..SaveManualPivot("Disease Registry/Diagnoses by Group.pivot","DiseaseRegistryDiagnoses",tMDX)
+}
+
+/// Create a pivot dashboard whose initial query uses both a runtime default and
+/// a static default. This provides a deployable example for dashboard-aware warming.
+ClassMethod CreateDemoDashboard() As %Status
+{
+  Set tFullName = "Disease Registry/Patient Overview.dashboard"
+  Set tSC = ##class(%DeepSee.UserPortal.Utils).%SetUserSetting("DiseaseRegistryDefaultStatus","""&[Active]""","Default registry status used by the cache-warmer demo","DefaultFilterValue")
+  If $$$ISERR(tSC) Quit tSC
+
+  If ##class(%DeepSee.UserLibrary.Utils).%FolderItemExists(tFullName) {
+    Set tDashboard = ##class(%DeepSee.UserLibrary.Utils).%OpenFolderItem(tFullName,.tSC)
+    If $$$ISERR(tSC) Quit tSC
+    If 'tDashboard.%IsA("%DeepSee.Dashboard.Definition") Quit $$$ERROR($$$GeneralError,"Existing item is not a dashboard: "_tFullName)
+    Do tDashboard.widgets.Clear()
+  } Else {
+    Set tDashboard = ##class(%DeepSee.Dashboard.Definition).%New()
+    Set tDashboard.fullName = tFullName
+  }
+
+  Set tDashboard.title = "Patient Overview"
+  Set tDashboard.worklistCount = 0
+
+  Set tWidget = ##class(%DeepSee.Dashboard.Widget).%New()
+  Set tWidget.name = "PatientStatus"
+  Set tWidget.type = "pivot"
+  Set tWidget.title = "Patients by Status"
+  Set tWidget.dataSource = "Disease Registry/Patients by Status.pivot"
+  Set tWidget.top = 10
+  Set tWidget.left = 10
+  Set tWidget.width = 800
+  Set tWidget.height = 420
+
+  Set tControl = ##class(%DeepSee.Dashboard.Control).%New()
+  Set tControl.name = "DefaultRegistryStatus"
+  Set tControl.action = "applyFilter"
+  Set tControl.targetProperty = "[Registry Status].[H1].[Registry Status]"
+  Set tControl.location = "widget"
+  Set tControl.type = "searchBox"
+  Set tControl.label = "Registry Status"
+  Set tControl.value = "@DiseaseRegistryDefaultStatus"
+  Do tWidget.controls.Insert(tControl)
+
+  Set tControl = ##class(%DeepSee.Dashboard.Control).%New()
+  Set tControl.name = "DefaultEmirate"
+  Set tControl.action = "applyFilter"
+  Set tControl.targetProperty = "[Emirate].[H1].[Emirate]"
+  Set tControl.location = "widget"
+  Set tControl.type = "searchBox"
+  Set tControl.label = "Emirate"
+  Set tControl.value = "&[Dubai]"
+  Do tWidget.controls.Insert(tControl)
+
+  Do tDashboard.widgets.Insert(tWidget)
+  Quit tDashboard.%Save()
 }
 
 ClassMethod SaveManualPivot(pFullName As %String, pCubeName As %String, pMDX As %String) As %Status [ Private ]

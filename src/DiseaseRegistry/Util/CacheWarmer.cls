@@ -1,13 +1,13 @@
 Include %occStatus
 
 /// Warms IRIS Business Intelligence caches after a cube build or synchronization.
-/// Saved pivots for the physical cube and its subject areas are executed through
+/// Saved pivots and their dashboard default-filter variants are executed through
 /// the standard cache-enabled %DeepSee.ResultSet API.
 Class DiseaseRegistry.Util.CacheWarmer Extends %RegisteredObject
 {
 
 /// Queue warming in a background process. Use this from Cube Manager Post-Build
-/// and Post-Synchronize Code so warming occurs after the final cache purge.
+/// and Post-Synchronize Code to keep query work outside Cube Manager's process.
 ClassMethod QueueCube(pCubeName As %String, pWaitSeconds As %Integer = 600, pVerbose As %Boolean = 0, pStopOnError As %Boolean = 0, Output pJobId As %Integer = 0) As %Status
 {
   Set pJobId = 0
@@ -24,15 +24,53 @@ ClassMethod QueueCube(pCubeName As %String, pWaitSeconds As %Integer = 600, pVer
 /// Coalesce duplicate workers, wait for the cube query lock, and warm saved pivots.
 ClassMethod WarmWhenAvailable(pCubeName As %String, pWaitSeconds As %Integer = 600, pVerbose As %Boolean = 0, pStopOnError As %Boolean = 0) As %Status
 {
+  Set tRunId = 0
+  Set tHistorySC = ..StartRun(pCubeName,"QueuedCube",.tRunId)
+  If $$$ISERR(tHistorySC) Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+
   Set tKey = $ZCONVERT(pCubeName,"U")
-  Lock +^DiseaseRegistry.CacheWarmer("cube",tKey):0 Else  Quit $$$OK
+  Lock +^DiseaseRegistry.CacheWarmer("cube",tKey):0
+  If '$TEST {
+    Do ..InitializeStats(pCubeName,.tStats)
+    Set tStats("finished") = ..CurrentTimestamp()
+    Set tStats("runId") = tRunId
+    If tRunId {
+      Set tHistorySC = ..FinishRun(tRunId,.tStats,$$$OK,"Skipped","Another worker was already warming this cube")
+      If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+    }
+    Quit $$$OK
+  }
 
   Set tSC = $$$OK
+  Set tRunFinished = 0
+  Set tStart = $ZH
   Try {
     Set tSC = ..WaitUntilAvailable(pCubeName,pWaitSeconds,pVerbose,.tReason)
-    If $$$ISOK(tSC) Set tSC = ..WarmCube(pCubeName,pStopOnError,pVerbose,.tStats)
+    If $$$ISOK(tSC) {
+      Set tSC = ..WarmCube(pCubeName,pStopOnError,pVerbose,.tStats,tRunId,"QueuedCube")
+      Set tRunFinished = 1
+    } Else {
+      Do ..InitializeStats(pCubeName,.tStats)
+      Set tStats("finished") = ..CurrentTimestamp()
+      Set tStats("elapsedTime") = $ZH-tStart
+      Set tStats("runId") = tRunId
+      If tRunId {
+        Set tHistorySC = ..FinishRun(tRunId,.tStats,tSC)
+        If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+      }
+      Set tRunFinished = 1
+    }
   } Catch ex {
     Set tSC = ex.AsStatus()
+  }
+
+  If ('tRunFinished),(tRunId) {
+    Do ..InitializeStats(pCubeName,.tStats)
+    Set tStats("finished") = ..CurrentTimestamp()
+    Set tStats("elapsedTime") = $ZH-tStart
+    Set tStats("runId") = tRunId
+    Set tHistorySC = ..FinishRun(tRunId,.tStats,tSC)
+    If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
   }
 
   Lock -^DiseaseRegistry.CacheWarmer("cube",tKey)
@@ -64,15 +102,17 @@ ClassMethod WaitUntilAvailable(pCubeName As %String, pWaitSeconds As %Integer = 
 
 /// Warm all saved pivots based on pCubeName. For a physical cube, pivots using
 /// subject areas based on it are included. pStats contains totals and query details.
-ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbose As %Boolean = 1, Output pStats = "") As %Status
+ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbose As %Boolean = 1, Output pStats = "", pRunId As %Integer = 0, pMode As %String = "DirectCube") As %Status
 {
-  Kill pStats
-  Set pStats("cube") = pCubeName
-  Set pStats("total") = 0
-  Set pStats("succeeded") = 0
-  Set pStats("failed") = 0
-  Set pStats("enumerationErrors") = 0
-  Set pStats("started") = $ZTIMESTAMP
+  Do ..InitializeStats(pCubeName,.pStats)
+  If 'pRunId {
+    Set tHistorySC = ..StartRun(pCubeName,pMode,.pRunId)
+    If $$$ISERR(tHistorySC) {
+      Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+      Set pRunId = -1
+    }
+  }
+  Set pStats("runId") = $Select(pRunId>0:pRunId,1:0)
   Set tStart = $ZH
   Set tSC = $$$OK
   Set tOverallSC = $$$OK
@@ -117,7 +157,7 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
       Set pStats("total") = pStats("total")+1
       Kill tParameters,tQueryStats
       Set tMDX = tPivot.%GetBaseMDX()
-      Set tQuerySC = ..WarmMDX(tMDX,.tParameters,pVerbose,.tQueryStats)
+      Set tQuerySC = ..WarmMDX(tMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tPivotName,"BasePivot")
       Merge pStats("queries",tPivotName) = tQueryStats
       Set pStats("queries",tPivotName,"status") = tQuerySC
 
@@ -135,6 +175,17 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
       Set tSC = $$$ERROR($$$GeneralError,"Error while enumerating saved pivots. SQLCODE="_SQLCODE_" "_$Get(%msg))
       Quit
     }
+
+    If tCursorOpen {
+      &sql(CLOSE DiseaseRegistryWarmPivots)
+      Set tCursorOpen = 0
+    }
+
+    If 'tStopped {
+      Set tDashboardSC = ..WarmDashboardDefaults(pCubeName,tTarget,tTargetIsSubjectArea,pStopOnError,pVerbose,pRunId,.pStats,.tDashboardStopped)
+      If $$$ISERR(tDashboardSC) Set tOverallSC = $System.Status.AppendStatus(tOverallSC,tDashboardSC)
+      If tDashboardStopped Set tStopped = 1
+    }
     Set tSC = tOverallSC
   } Catch ex {
     Set tSC = ex.AsStatus()
@@ -143,42 +194,515 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
   If tCursorOpen {
     &sql(CLOSE DiseaseRegistryWarmPivots)
   }
-  Set pStats("finished") = $ZTIMESTAMP
+  Set pStats("finished") = ..CurrentTimestamp()
   Set pStats("elapsedTime") = $ZH-tStart
+  If pRunId>0 {
+    Set tHistorySC = ..FinishRun(pRunId,.pStats,tSC)
+    If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+  }
   If pVerbose Write !,"Cache warming for [",pCubeName,"]: ",pStats("succeeded")," succeeded, ",pStats("failed")," failed",!
   Quit tSC
 }
 
 ClassMethod WarmPivot(pPivotName As %String, ByRef pParameters, pVerbose As %Boolean = 1, Output pStats = "") As %Status
 {
-  Set tPivot = ##class(%DeepSee.UserLibrary.Utils).%OpenFolderItem(pPivotName,.tSC)
-  If $$$ISERR(tSC) Quit tSC
-  If '$IsObject(tPivot) Quit $$$ERROR($$$GeneralError,"Saved pivot not found: "_pPivotName)
-  If 'tPivot.%IsA("%DeepSee.Dashboard.Pivot") Quit $$$ERROR($$$GeneralError,"Not a saved pivot: "_pPivotName)
-  Set tMDX = tPivot.%GetBaseMDX()
-  Set tSC = ..WarmMDX(tMDX,.pParameters,pVerbose,.pStats)
-  Set pStats("pivot") = tPivot.fullName
+  Do ..InitializeStats("",.pStats)
+  Set tStart = $ZH
+  Set tRunId = 0
+  Set tQuerySaved = 0
+  Set tHistorySC = ..StartRun("","DirectPivot",.tRunId)
+  If $$$ISERR(tHistorySC) {
+    Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+    Set tRunId = -1
+  }
+  Set pStats("runId") = $Select(tRunId>0:tRunId,1:0)
+  Set tSC = $$$OK
+
+  Try {
+    Set tPivot = ##class(%DeepSee.UserLibrary.Utils).%OpenFolderItem(pPivotName,.tSC)
+    If $$$ISERR(tSC) Quit
+    If '$IsObject(tPivot) {
+      Set tSC = $$$ERROR($$$GeneralError,"Saved pivot not found: "_pPivotName)
+      Quit
+    }
+    If 'tPivot.%IsA("%DeepSee.Dashboard.Pivot") {
+      Set tSC = $$$ERROR($$$GeneralError,"Not a saved pivot: "_pPivotName)
+      Quit
+    }
+    Set pStats("cube") = tPivot.cubeName
+    Set tMDX = tPivot.%GetBaseMDX()
+    Set tSC = ..WarmMDX(tMDX,.pParameters,pVerbose,.pStats,tRunId,tPivot.fullName,"Pivot")
+    Set tQuerySaved = 1
+    Set pStats("pivot") = tPivot.fullName
+  } Catch ex {
+    Set tSC = ex.AsStatus()
+  }
+
+  Set pStats("total") = 1
+  Set pStats("succeeded") = $Select($$$ISOK(tSC):1,1:0)
+  Set pStats("failed") = $Select($$$ISERR(tSC):1,1:0)
+  Set pStats("finished") = ..CurrentTimestamp()
+  Set pStats("elapsedTime") = $ZH-tStart
+  If (tRunId>0),('tQuerySaved) {
+    Set tHistorySC = ..SaveQuery(tRunId,pPivotName,.pStats,tSC,"Pivot")
+    If $$$ISERR(tHistorySC) Do ..Log("Unable to save cache-warming query history: "_$System.Status.GetErrorText(tHistorySC))
+  }
+  If tRunId>0 {
+    Set tHistorySC = ..FinishRun(tRunId,.pStats,tSC)
+    If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+  }
   Quit tSC
 }
 
+/// Append one combined %FILTER clause using the same default-value forms accepted
+/// by dashboard filter controls. pFilters is keyed by canonical level specification.
+ClassMethod ApplyDefaultFilters(pMDX As %String, ByRef pFilters, Output pFilteredMDX As %String, Output pFilterCount As %Integer = 0) As %Status
+{
+  Set pFilteredMDX = pMDX
+  Set pFilterCount = 0
+  If pMDX = "" Quit $$$ERROR($$$GeneralError,"An MDX query is required")
+
+  Set tFilterName = ""
+  For {
+    Set tFilterName = $Order(pFilters(tFilterName))
+    Quit:tFilterName=""
+    Set tFilterValue = $Get(pFilters(tFilterName))
+    Continue:tFilterValue=""
+    Set tSC = ..BuildFilterTerm(tFilterName,tFilterValue,.tTerm)
+    If $$$ISERR(tSC) Quit
+    Set tTerms($Increment(pFilterCount)) = tTerm
+  }
+  If $$$ISERR($Get(tSC,$$$OK)) Quit tSC
+  If pFilterCount = 0 Quit $$$OK
+
+  Set tClause = ""
+  For i = 1:1:pFilterCount-1 {
+    Set tClause = tClause_"NONEMPTYCROSSJOIN("_tTerms(i)_","
+  }
+  Set tClause = tClause_tTerms(pFilterCount)
+  For i = 1:1:pFilterCount-1 Set tClause = tClause_")"
+  Set pFilteredMDX = pMDX_" %FILTER "_tClause
+  Quit $$$OK
+}
+
 /// Execute arbitrary MDX synchronously. Result caching is enabled by default.
-ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1, Output pStats = "") As %Status
+ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1, Output pStats = "", pRunId As %Integer = 0, pQueryName As %String = "Ad hoc MDX", pSourceType As %String = "AdHocMDX", pDashboardName As %String = "", pWidgetName As %String = "", pDefaultFilterCount As %Integer = 0) As %Status
+{
+  Do ..InitializeStats("",.pStats)
+  Set tOwnRun = (pRunId=0)
+  If tOwnRun {
+    Set tHistorySC = ..StartRun("","DirectMDX",.pRunId)
+    If $$$ISERR(tHistorySC) {
+      Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+      Set pRunId = -1
+    }
+  }
+  Set pStats("runId") = $Select(pRunId>0:pRunId,1:0)
+  Set tStart = $ZH
+  Set tSC = $$$OK
+  Set tResult = ""
+
+  Try {
+    If pMDX = "" {
+      Set tSC = $$$ERROR($$$GeneralError,"An MDX query is required")
+      Quit
+    }
+    Set tResult = ##class(%DeepSee.ResultSet).%ExecuteDirect(pMDX,.pParameters,.tSC)
+    If $$$ISERR(tSC) Quit
+    If '$IsObject(tResult) {
+      Set tSC = $$$ERROR($$$GeneralError,"The query did not return a result set")
+      Quit
+    }
+
+    Set pStats("cube") = tResult.%GetCubeName()
+    Set pStats("queryKey") = tResult.%GetQueryKey()
+    Set pStats("rows") = tResult.%GetRowCount()
+    Set pStats("columns") = tResult.%GetColumnCount()
+  } Catch ex {
+    Set tSC = ex.AsStatus()
+  }
+
+  Set pStats("elapsedTime") = $ZH-tStart
+  Set pStats("finished") = ..CurrentTimestamp()
+  Set pStats("total") = 1
+  Set pStats("succeeded") = $Select($$$ISOK(tSC):1,1:0)
+  Set pStats("failed") = $Select($$$ISERR(tSC):1,1:0)
+  If (pRunId>0),(pStats("cube")'="") {
+    Set tHistorySC = ..UpdateRunCube(pRunId,pStats("cube"))
+    If $$$ISERR(tHistorySC) Do ..Log("Unable to update cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+  }
+  If pRunId>0 {
+    Set tHistorySC = ..SaveQuery(pRunId,pQueryName,.pStats,tSC,pSourceType,pDashboardName,pWidgetName,pDefaultFilterCount)
+    If $$$ISERR(tHistorySC) Do ..Log("Unable to save cache-warming query history: "_$System.Status.GetErrorText(tHistorySC))
+  }
+  If (tOwnRun),(pRunId>0) {
+    Set tHistorySC = ..FinishRun(pRunId,.pStats,tSC)
+    If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+  }
+  If pVerbose,$$$ISOK(tSC) Write !,"Warmed ",pStats("queryKey")," on [",pStats("cube"),"] in ",pStats("elapsedTime")," seconds",!
+  Set tResult = ""
+  Quit tSC
+}
+
+/// Warm the initial filtered query for each dashboard pivot widget whose saved
+/// definition supplies one or more default filter values.
+ClassMethod WarmDashboardDefaults(pCubeName As %String, pTarget As %String, pTargetIsSubjectArea As %Boolean, pStopOnError As %Boolean, pVerbose As %Boolean, pRunId As %Integer, ByRef pStats, Output pStopped As %Boolean) As %Status [ Private ]
+{
+  Set pStopped = 0
+  Set tOverallSC = $$$OK
+  Set tCursorOpen = 0
+
+  &sql(DECLARE DiseaseRegistryWarmDashboards CURSOR FOR SELECT %ID FROM %DeepSee_Dashboard.Definition)
+  &sql(OPEN DiseaseRegistryWarmDashboards)
+  If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate dashboards. SQLCODE="_SQLCODE_" "_$Get(%msg))
+  Set tCursorOpen = 1
+
+  For {
+    &sql(FETCH DiseaseRegistryWarmDashboards INTO :tDashboardId)
+    Quit:SQLCODE'=0
+
+    Set tOpenSC = $$$OK
+    Set tDashboard = ##class(%DeepSee.Dashboard.Definition).%OpenId(tDashboardId,,.tOpenSC)
+    If $$$ISERR(tOpenSC) {
+      Set pStats("enumerationErrors") = pStats("enumerationErrors")+1
+      Do ..Log("Unable to inspect dashboard ID "_tDashboardId_": "_$System.Status.GetErrorText(tOpenSC))
+      Continue
+    }
+
+    Kill tWidgetName,tWidgetIndex,tWidgetSource,tFilterSet
+    Set tWidgetCount = tDashboard.widgets.Count()
+    For tWidgetIndexNumber = 1:1:tWidgetCount {
+      Set tWidget = tDashboard.widgets.GetAt(tWidgetIndexNumber)
+      Set tName = tWidget.name
+      If tName = "" Set tName = "$widget"_tWidgetIndexNumber
+      Set tWidgetName(tWidgetIndexNumber) = tName
+      Set tWidgetIndex($ZCONVERT(tName,"U"),tWidgetIndexNumber) = ""
+      Set tWidgetSource(tWidgetIndexNumber) = tWidget.dataSource
+
+      Set tFilterName = ""
+      For {
+        Set tFilterValue = tWidget.filterState.GetNext(.tFilterName)
+        Quit:tFilterName=""
+        If tFilterValue'="" Set tFilterSet(tWidgetIndexNumber,tFilterName) = tFilterValue
+      }
+    }
+
+    // Dashboard controls are stored on widgets. Their target determines which
+    // widget receives the initial filter value.
+    For tOwnerIndex = 1:1:tWidgetCount {
+      Set tOwnerWidget = tDashboard.widgets.GetAt(tOwnerIndex)
+      For tControlIndex = 1:1:tOwnerWidget.controls.Count() {
+        Set tControl = tOwnerWidget.controls.GetAt(tControlIndex)
+        Set tAction = $ZCONVERT(tControl.action,"U")
+        Continue:(tAction'="")&&(tAction'="APPLYFILTER")&&(tAction'="SETFILTER")
+        Set tFilterName = tControl.targetProperty
+        Continue:tFilterName=""
+
+        Set tResolveSC = ..ResolveDefaultFilterValue(tControl.value,.tFilterValue)
+        If $$$ISERR(tResolveSC) {
+          Set pStats("enumerationErrors") = pStats("enumerationErrors")+1
+          Do ..Log("Unable to resolve dashboard default for "_tDashboard.fullName_" / "_tFilterName_": "_$System.Status.GetErrorText(tResolveSC))
+          Continue
+        }
+        Continue:tFilterValue=""
+
+        Set tTargetList = tControl.target
+        If tTargetList = "" {
+          Set tFilterSet(tOwnerIndex,tFilterName) = tFilterValue
+        } ElseIf tTargetList = "*" {
+          For tTargetIndex = 1:1:tWidgetCount Set tFilterSet(tTargetIndex,tFilterName) = tFilterValue
+        } Else {
+          For tTargetPiece = 1:1:$Length(tTargetList,",") {
+            Set tTargetName = $ZSTRIP($Piece(tTargetList,",",tTargetPiece),"<>W")
+            If tTargetName = "" Set tTargetName = tWidgetName(tOwnerIndex)
+            Set tTargetIndex = ""
+            For {
+              Set tTargetIndex = $Order(tWidgetIndex($ZCONVERT(tTargetName,"U"),tTargetIndex))
+              Quit:tTargetIndex=""
+              Set tFilterSet(tTargetIndex,tFilterName) = tFilterValue
+            }
+          }
+        }
+      }
+    }
+
+    For tWidgetIndexNumber = 1:1:tWidgetCount {
+      Quit:pStopped
+      Set tDataSource = tWidgetSource(tWidgetIndexNumber)
+      Set tExtension = $ZCONVERT($Piece(tDataSource,".",$Length(tDataSource,".")),"L")
+      Continue:tExtension'="pivot"
+      Continue:'$Data(tFilterSet(tWidgetIndexNumber))
+
+      Set tPivotSC = $$$OK
+      Set tPivot = ##class(%DeepSee.UserLibrary.Utils).%OpenFolderItem(tDataSource,.tPivotSC)
+      If $$$ISERR(tPivotSC) {
+        Set pStats("enumerationErrors") = pStats("enumerationErrors")+1
+        Do ..Log("Unable to inspect "_tDashboard.fullName_" / "_tWidgetName(tWidgetIndexNumber)_": "_$System.Status.GetErrorText(tPivotSC))
+        Continue
+      }
+      If '$IsObject(tPivot) {
+        Set pStats("enumerationErrors") = pStats("enumerationErrors")+1
+        Do ..Log("Unable to inspect "_tDashboard.fullName_" / "_tWidgetName(tWidgetIndexNumber)_": dashboard pivot not found: "_tDataSource)
+        Continue
+      }
+      If 'tPivot.%IsA("%DeepSee.Dashboard.Pivot") {
+        Set pStats("enumerationErrors") = pStats("enumerationErrors")+1
+        Do ..Log("Unable to inspect "_tDashboard.fullName_" / "_tWidgetName(tWidgetIndexNumber)_": data source is not a pivot: "_tDataSource)
+        Continue
+      }
+
+      Set tPivotCube = tPivot.cubeName
+      Set tPivotBase = ##class(%DeepSee.Utils).%GetBaseCube(tPivotCube)
+      If tPivotBase = "" Set tPivotBase = tPivotCube
+      Set tMatches = $Select(pTargetIsSubjectArea:$ZCONVERT(tPivotCube,"U")=pTarget,1:$ZCONVERT(tPivotBase,"U")=pTarget)
+      Continue:'tMatches
+
+      Kill tAvailableFilters,tVisited,tAllowedFilters,tApplicableFilters
+      Set tFilterSC = ##class(%DeepSee.Dashboard.Utils).%GetFiltersForDataSource(tDataSource,.tAvailableFilters,.tVisited)
+      If $$$ISERR(tFilterSC) {
+        Set pStats("enumerationErrors") = pStats("enumerationErrors")+1
+        Do ..Log("Unable to inspect filters for "_tDataSource_": "_$System.Status.GetErrorText(tFilterSC))
+        Continue
+      }
+      Set tAvailableIndex = ""
+      For {
+        Set tAvailableIndex = $Order(tAvailableFilters(tAvailableIndex))
+        Quit:tAvailableIndex=""
+        Set tCanonicalFilter = $ListGet(tAvailableFilters(tAvailableIndex),2)
+        If tCanonicalFilter'="" Set tAllowedFilters($ZCONVERT(tCanonicalFilter,"U")) = tCanonicalFilter
+      }
+
+      Set tFilterName = ""
+      For {
+        Set tFilterName = $Order(tFilterSet(tWidgetIndexNumber,tFilterName))
+        Quit:tFilterName=""
+        Set tCanonicalFilter = $Get(tAllowedFilters($ZCONVERT(tFilterName,"U")))
+        Continue:tCanonicalFilter=""
+        Set tApplicableFilters(tCanonicalFilter) = tFilterSet(tWidgetIndexNumber,tFilterName)
+      }
+      Continue:'$Data(tApplicableFilters)
+
+      Set tFilterSC = ..ApplyDefaultFilters(tPivot.%GetBaseMDX(),.tApplicableFilters,.tFilteredMDX,.tDefaultFilterCount)
+      If $$$ISERR(tFilterSC) {
+        Set pStats("enumerationErrors") = pStats("enumerationErrors")+1
+        Do ..Log("Unable to construct dashboard defaults for "_tDashboard.fullName_" / "_tWidgetName(tWidgetIndexNumber)_": "_$System.Status.GetErrorText(tFilterSC))
+        Continue
+      }
+      Continue:tDefaultFilterCount=0
+
+      Set tQueryName = "Dashboard "_tDashboard.fullName_" / "_tWidgetName(tWidgetIndexNumber)_" [defaults]"
+      Set pStats("total") = pStats("total")+1
+      Set pStats("dashboardDefaults") = pStats("dashboardDefaults")+1
+      Kill tParameters,tQueryStats
+      Set tQuerySC = ..WarmMDX(tFilteredMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tQueryName,"DashboardDefault",tDashboard.fullName,tWidgetName(tWidgetIndexNumber),tDefaultFilterCount)
+      Merge pStats("queries",tQueryName) = tQueryStats
+      Set pStats("queries",tQueryName,"status") = tQuerySC
+
+      If $$$ISERR(tQuerySC) {
+        Set pStats("failed") = pStats("failed")+1
+        Set tOverallSC = $System.Status.AppendStatus(tOverallSC,tQuerySC)
+        Do ..Log("Dashboard-default warming failed for "_tQueryName_": "_$System.Status.GetErrorText(tQuerySC))
+        If pStopOnError Set pStopped = 1
+      } Else {
+        Set pStats("succeeded") = pStats("succeeded")+1
+      }
+    }
+    Quit:pStopped
+  }
+
+  Set tFetchCode = SQLCODE
+  If tCursorOpen {
+    &sql(CLOSE DiseaseRegistryWarmDashboards)
+  }
+  If ('pStopped),(tFetchCode<0) Quit $$$ERROR($$$GeneralError,"Error while enumerating dashboards. SQLCODE="_tFetchCode_" "_$Get(%msg))
+  Quit tOverallSC
+}
+
+ClassMethod ResolveDefaultFilterValue(pValue As %String, Output pResolved As %String) As %Status [ Private ]
+{
+  Set pResolved = pValue
+  If $Extract(pValue,1) = "@" {
+    Set pResolved = ##class(%DeepSee.UserPortal.Utils).%GetUserSetting($Extract(pValue,2,*),.tSC)
+    Quit tSC
+  }
+  Quit $$$OK
+}
+
+ClassMethod BuildFilterTerm(pLevel As %String, pValue As %String, Output pTerm As %String) As %Status [ Private ]
+{
+  Set pTerm = ""
+  Set tLevel = $ZSTRIP(pLevel,"<>W")
+  Set tValue = $ZSTRIP(pValue,"<>W")
+  If tLevel = "" Quit $$$ERROR($$$GeneralError,"A dashboard filter level is required")
+  If tValue = "" Quit $$$ERROR($$$GeneralError,"A dashboard filter value is required")
+
+  Set tIsNot = 0
+  If ($ZCONVERT($Extract(tValue,1,4),"U")="%NOT"),(($Extract(tValue,5)=" ")||($Extract(tValue,5)="{")) {
+    Set tIsNot = 1
+    If $Extract(tValue,5) = "{" {
+      Set tValue = $Extract(tValue,5,*)
+    } Else {
+      Set tValue = $ZSTRIP($Extract(tValue,6,*),"<>W")
+    }
+  }
+
+  If $Extract(tValue,1,2) = "&[" {
+    If tIsNot {
+      Set pTerm = tLevel_"."_tValue_".%NOT"
+    } ElseIf tValue["]:&[" {
+      Set pTerm = "%OR("_tLevel_"."_tValue_")"
+    } Else {
+      Set pTerm = tLevel_"."_tValue
+    }
+    Quit $$$OK
+  }
+
+  If $Extract(tValue,1) = "{" {
+    If $Extract(tValue,*)'="}" Quit $$$ERROR($$$GeneralError,"Invalid dashboard filter set: "_tValue)
+    Set tBody = $Extract(tValue,2,*-1)
+    If tBody = "" Quit $$$ERROR($$$GeneralError,"Dashboard filter set cannot be empty")
+    Set tItemCount = $Length(tBody,"],&[")
+    Set tSet = ""
+    For i = 1:1:tItemCount {
+      Set tItem = $Piece(tBody,"],&[",i)
+      If $Extract(tItem,1)'="&" Set tItem = "&["_tItem
+      If i'=tItemCount Set tItem = tItem_"]"
+      Set tQualified = tLevel_"."_tItem
+      If tIsNot Set tQualified = tQualified_".%NOT"
+      Set tSet = tSet_$Select(tSet="":"",1:",")_tQualified
+    }
+    Set pTerm = $Select(tIsNot:"("_tSet_")",1:"%OR({"_tSet_"})")
+    Quit $$$OK
+  }
+
+  Set tEscapedValue = $Replace(tValue,"]","]]")
+  Set pTerm = tLevel_".&["_tEscapedValue_"]"
+  If tIsNot Set pTerm = pTerm_".%NOT"
+  Quit $$$OK
+}
+
+/// Delete completed cache-warming history older than pDaysToKeep.
+ClassMethod PurgeHistory(pDaysToKeep As %Integer = 30, Output pDeleted As %Integer = 0) As %Status
+{
+  Set pDeleted = 0
+  If pDaysToKeep < 0 Quit $$$ERROR($$$GeneralError,"pDaysToKeep cannot be negative")
+
+  Set tNowH = $ZTIMESTAMP
+  Set tCutoffH = ($Piece(tNowH,",",1)-pDaysToKeep)_","_$Piece(tNowH,",",2)
+  Set tCutoff = $ZDATETIME(tCutoffH,3,1,6)
+  Set tSC = $$$OK
+  Set tCursorOpen = 0
+
+  &sql(DECLARE DiseaseRegistryOldWarmRuns CURSOR FOR
+    SELECT %ID FROM DiseaseRegistry_Model.CacheWarmRun
+    WHERE StartedAt < :tCutoff AND Outcome <> 'Running')
+  &sql(OPEN DiseaseRegistryOldWarmRuns)
+  If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate cache-warming history. SQLCODE="_SQLCODE_" "_$Get(%msg))
+  Set tCursorOpen = 1
+
+  For {
+    &sql(FETCH DiseaseRegistryOldWarmRuns INTO :tRunId)
+    Quit:SQLCODE'=0
+    Set tSC = ##class(DiseaseRegistry.Model.CacheWarmRun).%DeleteId(tRunId)
+    Quit:$$$ISERR(tSC)
+    Set pDeleted = pDeleted+1
+  }
+  Set tFetchCode = SQLCODE
+  If tCursorOpen {
+    &sql(CLOSE DiseaseRegistryOldWarmRuns)
+  }
+  If $$$ISERR(tSC) Quit tSC
+  If tFetchCode < 0 Quit $$$ERROR($$$GeneralError,"Unable to fetch cache-warming history. SQLCODE="_tFetchCode_" "_$Get(%msg))
+  Quit $$$OK
+}
+
+ClassMethod InitializeStats(pCubeName As %String, Output pStats) [ Private ]
 {
   Kill pStats
-  If pMDX = "" Quit $$$ERROR($$$GeneralError,"An MDX query is required")
-  Set tStart = $ZH
-  Set tResult = ##class(%DeepSee.ResultSet).%ExecuteDirect(pMDX,.pParameters,.tSC)
-  If $$$ISERR(tSC) Quit tSC
-  If '$IsObject(tResult) Quit $$$ERROR($$$GeneralError,"The query did not return a result set")
+  Set pStats("cube") = pCubeName
+  Set pStats("total") = 0
+  Set pStats("succeeded") = 0
+  Set pStats("failed") = 0
+  Set pStats("enumerationErrors") = 0
+  Set pStats("dashboardDefaults") = 0
+  Set pStats("started") = ..CurrentTimestamp()
+  Set pStats("elapsedTime") = 0
+}
 
-  Set pStats("cube") = tResult.%GetCubeName()
-  Set pStats("queryKey") = tResult.%GetQueryKey()
-  Set pStats("rows") = tResult.%GetRowCount()
-  Set pStats("columns") = tResult.%GetColumnCount()
-  Set pStats("elapsedTime") = $ZH-tStart
-  If pVerbose Write !,"Warmed ",pStats("queryKey")," on [",pStats("cube"),"] in ",pStats("elapsedTime")," seconds",!
-  Set tResult = ""
-  Quit $$$OK
+ClassMethod StartRun(pCubeName As %String, pMode As %String, Output pRunId As %Integer) As %Status [ Private ]
+{
+  Set pRunId = 0
+  Set tRun = ##class(DiseaseRegistry.Model.CacheWarmRun).%New()
+  Set tRun.CubeName = $Extract(pCubeName,1,128)
+  Set tRun.Mode = $Extract(pMode,1,32)
+  Set tRun.Outcome = "Running"
+  Set tRun.StartedAt = ..CurrentTimestamp()
+  Set tRun.ProcessId = $Extract($JOB,1,128)
+  Set tSC = tRun.%Save()
+  If $$$ISOK(tSC) Set pRunId = tRun.%Id()
+  Quit tSC
+}
+
+ClassMethod UpdateRunCube(pRunId As %Integer, pCubeName As %String) As %Status [ Private ]
+{
+  If pRunId < 1 Quit $$$OK
+  Set tRun = ##class(DiseaseRegistry.Model.CacheWarmRun).%OpenId(pRunId,,.tSC)
+  If $$$ISERR(tSC) Quit tSC
+  If '$IsObject(tRun) Quit $$$ERROR($$$GeneralError,"Cache-warming run not found: "_pRunId)
+  Set tRun.CubeName = $Extract(pCubeName,1,128)
+  Quit tRun.%Save()
+}
+
+ClassMethod SaveQuery(pRunId As %Integer, pQueryName As %String, ByRef pStats, pSC As %Status, pSourceType As %String = "AdHocMDX", pDashboardName As %String = "", pWidgetName As %String = "", pDefaultFilterCount As %Integer = 0) As %Status [ Private ]
+{
+  If pRunId < 1 Quit $$$OK
+  Set tRun = ##class(DiseaseRegistry.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
+  If $$$ISERR(tOpenSC) Quit tOpenSC
+  If '$IsObject(tRun) Quit $$$ERROR($$$GeneralError,"Cache-warming run not found: "_pRunId)
+
+  Set tQuery = ##class(DiseaseRegistry.Model.CacheWarmQuery).%New()
+  Set tQuery.Run = tRun
+  Set tQuery.QueryName = $Extract(pQueryName,1,512)
+  Set tQuery.SourceType = $Extract(pSourceType,1,32)
+  Set tQuery.DashboardName = $Extract(pDashboardName,1,512)
+  Set tQuery.WidgetName = $Extract(pWidgetName,1,255)
+  Set tQuery.DefaultFilterCount = pDefaultFilterCount
+  Set tQuery.CubeName = $Extract($Get(pStats("cube")),1,128)
+  Set tQuery.QueryKey = $Extract($Get(pStats("queryKey")),1,128)
+  Set tQuery.RowCount = $Get(pStats("rows"),0)
+  Set tQuery.ColumnCount = $Get(pStats("columns"),0)
+  Set tQuery.ElapsedSeconds = $Get(pStats("elapsedTime"),0)
+  Set tQuery.Success = $$$ISOK(pSC)
+  Set tQuery.StatusText = $Extract($Select($$$ISOK(pSC):"OK",1:$System.Status.GetErrorText(pSC)),1,4096)
+  Quit tQuery.%Save()
+}
+
+ClassMethod FinishRun(pRunId As %Integer, ByRef pStats, pSC As %Status, pOutcome As %String = "", pStatusText As %String = "") As %Status [ Private ]
+{
+  If pRunId < 1 Quit $$$OK
+  Set tRun = ##class(DiseaseRegistry.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
+  If $$$ISERR(tOpenSC) Quit tOpenSC
+  If '$IsObject(tRun) Quit $$$ERROR($$$GeneralError,"Cache-warming run not found: "_pRunId)
+
+  If $Get(pStats("cube"))'="" Set tRun.CubeName = $Extract(pStats("cube"),1,128)
+  Set tRun.FinishedAt = ..CurrentTimestamp()
+  Set tRun.TotalQueries = $Get(pStats("total"),0)
+  Set tRun.SucceededQueries = $Get(pStats("succeeded"),0)
+  Set tRun.FailedQueries = $Get(pStats("failed"),0)
+  Set tRun.EnumerationErrors = $Get(pStats("enumerationErrors"),0)
+  Set tRun.ElapsedSeconds = $Get(pStats("elapsedTime"),0)
+  If pOutcome = "" {
+    Set pOutcome = $Select($$$ISOK(pSC)&&(tRun.EnumerationErrors=0):"Success",tRun.SucceededQueries>0:"PartialFailure",1:"Failure")
+  }
+  Set tRun.Outcome = pOutcome
+  If pStatusText = "" Set pStatusText = $Select(tRun.EnumerationErrors>0:"Completed with "_tRun.EnumerationErrors_" enumeration or configuration error(s)",$$$ISOK(pSC):"OK",1:$System.Status.GetErrorText(pSC))
+  Set tRun.StatusText = $Extract(pStatusText,1,4096)
+  Quit tRun.%Save()
+}
+
+ClassMethod CurrentTimestamp() As %TimeStamp [ Private ]
+{
+  Quit $ZDATETIME($ZTIMESTAMP,3,1,6)
 }
 
 ClassMethod Log(pMessage As %String) As %Status [ Private ]

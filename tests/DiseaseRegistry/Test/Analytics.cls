@@ -54,4 +54,43 @@ Method TestCacheWarmerRejectsMissingCubeName()
   Do $$$AssertStatusNotOK(sc)
 }
 
+Method TestDashboardDefaultFilterComposition()
+{
+  Kill filters
+  Set filters("[Registry Status].[H1].[Registry Status]") = "&[Active]"
+  Set filters("[Emirate].[H1].[Emirate]") = "{&[Dubai],&[Ajman]}"
+  Set baseMDX = "SELECT {[Measures].[%Count]} ON 0 FROM [DiseaseRegistryPatients]"
+
+  Set sc = ##class(DiseaseRegistry.Util.CacheWarmer).ApplyDefaultFilters(baseMDX,.filters,.filteredMDX,.filterCount)
+  Do $$$AssertStatusOK(sc)
+  Do $$$AssertEquals(filterCount,2)
+  Do $$$AssertTrue(filteredMDX[" %FILTER NONEMPTYCROSSJOIN(")
+  Do $$$AssertTrue(filteredMDX["[Registry Status].[H1].[Registry Status].&[Active]")
+  Do $$$AssertTrue(filteredMDX["%OR({[Emirate].[H1].[Emirate].&[Dubai],[Emirate].[H1].[Emirate].&[Ajman]})")
+}
+
+Method TestCacheWarmStatsArePersistent()
+{
+  Kill parameters,stats
+  Set sc = ##class(DiseaseRegistry.Util.CacheWarmer).WarmMDX("",.parameters,0,.stats)
+  Do $$$AssertStatusNotOK(sc)
+  Set runId = $Get(stats("runId"),0)
+  Do $$$AssertNotEquals(runId,0)
+
+  Set run = ##class(DiseaseRegistry.Model.CacheWarmRun).%OpenId(runId,,.openSC)
+  Do $$$AssertStatusOK(openSC)
+  Do $$$AssertTrue($IsObject(run))
+  Do $$$AssertEquals(run.Mode,"DirectMDX")
+  Do $$$AssertEquals(run.Outcome,"Failure")
+  Do $$$AssertEquals(run.TotalQueries,1)
+  Do $$$AssertEquals(run.FailedQueries,1)
+  Do $$$AssertEquals(run.Queries.Count(),1)
+  Set query = run.Queries.GetAt(1)
+  Do $$$AssertEquals(query.SourceType,"AdHocMDX")
+  Do $$$AssertEquals(query.DefaultFilterCount,0)
+
+  Set deleteSC = ##class(DiseaseRegistry.Model.CacheWarmRun).%DeleteId(runId)
+  Do $$$AssertStatusOK(deleteSC)
+}
+
 }
