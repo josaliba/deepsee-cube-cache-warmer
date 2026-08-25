@@ -1,0 +1,30 @@
+{
+  "files.associations": {
+    "*.cls": "objectscript-class",
+    "*.inc": "objectscript",
+    "*.int": "objectscript",
+    "*.mac": "objectscript"
+  },
+  "intersystems.servers": {
+    "DiseaseRegistry": {
+      "webServer": {
+        "scheme": "http",
+        "host": "127.0.0.1",
+        "port": 52773
+      },
+      "username": "_SYSTEM",
+      "description": "Local IRIS for Health container"
+    }
+  },
+  "objectscript.conn": {
+    "active": true,
+    "server": "DiseaseRegistry",
+    "ns": "DISEASEREGISTRY"
+  },
+  "objectscript.compileOnSave": true,
+  "objectscript.export": {
+    "folder": "src",
+    "addCategory": false
+  }
+}
+

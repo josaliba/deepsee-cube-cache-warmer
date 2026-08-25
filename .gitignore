@@ -1,0 +1,10 @@
+.DS_Store
+.env
+.idea/
+.vscode/*.log
+data/*
+!data/.gitkeep
+license/*
+!license/README.md
+*.log
+*.tmp

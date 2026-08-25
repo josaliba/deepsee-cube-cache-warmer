@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+if [[ ! -f license/iris.key ]]; then
+  echo "Missing license/iris.key. Copy your valid IRIS for Health license key there before starting." >&2
+  exit 1
+fi
+
+docker compose up --build -d
+docker compose ps

@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "intersystems-community.vscode-objectscript",
+    "ms-azuretools.vscode-docker"
+  ]
+}
+

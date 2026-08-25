@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+docker compose exec -T iris iris session IRIS -U DISEASEREGISTRY <<'OBJECTSCRIPT'
+set sc=$SYSTEM.OBJ.LoadDir("/workspace/tests","ck",,1)
+if $SYSTEM.Status.IsError(sc) { do $SYSTEM.OBJ.DisplayError(sc) halt 1 }
+set sc=##class(%UnitTest.Manager).RunTest("DiseaseRegistry.Test")
+if 'sc { halt 1 }
+halt
+OBJECTSCRIPT
+

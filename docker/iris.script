@@ -1,0 +1,7 @@
+zn "%SYS"
+set sc=$SYSTEM.OBJ.Load("/opt/disease-registry/docker/App.Installer.cls","ck")
+if $SYSTEM.Status.IsError(sc) { do $SYSTEM.OBJ.DisplayError(sc) halt 1 }
+set sc=##class(App.Installer).Setup()
+if $SYSTEM.Status.IsError(sc) { do $SYSTEM.OBJ.DisplayError(sc) halt 1 }
+halt
+
