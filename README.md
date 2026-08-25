@@ -32,7 +32,7 @@ When the logs show `Disease Registry bootstrap complete`, open:
 - IRIS terminal: `./bin/terminal`
 - Namespace: `DISEASEREGISTRY`
 
-The initial development credentials are `_SYSTEM` / `SYS`; IRIS may require a password change on first use. VS Code deliberately does not store the password—enter the current password when the ObjectScript extension prompts and allow your OS keychain to save it. The included Web Gateway connection uses the initial `CSPSystem` credentials and must be updated if that password changes.
+The local development credentials are `_SYSTEM` / `SYS`. Bootstrap clears the first-login password-change requirement for `_SYSTEM` and `SuperUser`, so their password remains `SYS`. VS Code deliberately does not store the password—enter `SYS` when the ObjectScript extension prompts and allow your OS keychain to save it. The included Web Gateway connection uses the initial `CSPSystem` credentials and must be updated if that password changes.
 
 ## Development workflow
 
@@ -71,4 +71,4 @@ Before starting, `bin/start` also verifies that the configured SuperServer and W
 
 Defaults can be overridden by copying `.env.example` to `.env`. Keep `IRIS_IMAGE` and `WEBGATEWAY_IMAGE` on matching release tags, and pin both to an explicit version before using this outside local development.
 
-This scaffold uses licensed IRIS for Health with development-oriented authentication and HTTP-only Web Gateway settings. Review licensing, credentials, TLS, auditing, data retention, backup, and healthcare privacy requirements before storing real patient data or deploying beyond a developer workstation.
+This scaffold uses licensed IRIS for Health with development-oriented authentication and HTTP-only Web Gateway settings. Keeping predefined administrator passwords at `SYS` is intentionally insecure and suitable only for an isolated developer workstation. Change all default credentials and review licensing, TLS, auditing, data retention, backup, and healthcare privacy requirements before storing real patient data or deploying elsewhere.
