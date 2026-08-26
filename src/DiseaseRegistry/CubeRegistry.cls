@@ -10,7 +10,7 @@ XData Registry [ XMLNamespace = "http://www.intersystems.com/deepsee" ]
   <Groups>
     <Group GroupName="Disease Registry Diagnoses" IsRegistered="true" Disabled="false" BuildAsynch="true">
       <Cubes>
-        <Cube CubeKey="DISEASEREGISTRYDIAGNOSES" CubeDisplayName="Disease Registry Diagnoses" Disabled="false" DSTimeEnabled="true" BuildAsynch="true" PostSynchCode="do ##class(CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryDiagnoses&quot;)" PostBuildCode="do ##class(CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryDiagnoses&quot;)">
+        <Cube CubeKey="DISEASEREGISTRYDIAGNOSES" CubeDisplayName="Disease Registry Diagnoses" Disabled="false" DSTimeEnabled="true" BuildAsynch="true" PostSynchCode="do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryDiagnoses&quot;)" PostBuildCode="do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryDiagnoses&quot;)">
           <UpdatePlan>Every</UpdatePlan>
           <BuildFrequency>5</BuildFrequency>
           <BuildTimeUnit>Minute</BuildTimeUnit>
@@ -30,7 +30,7 @@ XData Registry [ XMLNamespace = "http://www.intersystems.com/deepsee" ]
     </Group>
     <Group GroupName="Disease Registry Patients" IsRegistered="true" Disabled="false" BuildAsynch="true">
       <Cubes>
-        <Cube CubeKey="DISEASEREGISTRYPATIENTS" CubeDisplayName="Disease Registry Patients" Disabled="false" DSTimeEnabled="true" BuildAsynch="true" PostSynchCode="do ##class(CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryPatients&quot;)" PostBuildCode="do ##class(CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryPatients&quot;)">
+        <Cube CubeKey="DISEASEREGISTRYPATIENTS" CubeDisplayName="Disease Registry Patients" Disabled="false" DSTimeEnabled="true" BuildAsynch="true" PostSynchCode="do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryPatients&quot;)" PostBuildCode="do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryPatients&quot;)">
           <UpdatePlan>Every</UpdatePlan>
           <BuildFrequency>5</BuildFrequency>
           <BuildTimeUnit>Minute</BuildTimeUnit>

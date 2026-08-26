@@ -3,10 +3,10 @@ Include %occStatus
 /// Records dashboard opens through IRIS BI's documented ^DeepSee.AuditCode hook.
 /// The hook performs one short, contention-safe update and never interrupts a
 /// dashboard request if usage tracking encounters an error.
-Class CubeCacheWarmer.DashboardUsage Extends %RegisteredObject
+Class DHA.BI.CubeCacheWarmer.DashboardUsage Extends %RegisteredObject
 {
 
-Parameter AUDITCOMMAND = "do ##class(CubeCacheWarmer.DashboardUsage).Record(%dsDashboard)";
+Parameter AUDITCOMMAND = "do ##class(DHA.BI.CubeCacheWarmer.DashboardUsage).Record(%dsDashboard)";
 
 /// Install the dashboard-access hook in the current namespace. If another BI
 /// dashboard audit command already exists, it is retained and runs afterwards.
@@ -26,13 +26,17 @@ ClassMethod Install(Output pChanged As %Boolean = 0) As %Status
 /// was configured before installation in place.
 ClassMethod Uninstall(Output pChanged As %Boolean = 0) As %Status
 {
+  Quit ..RemoveCommand(..#AUDITCOMMAND,.pChanged)
+}
+
+ClassMethod RemoveCommand(pCommand As %String, Output pChanged As %Boolean = 0) As %Status [ Private ]
+{
   Set pChanged = 0
-  Set tCommand = ..#AUDITCOMMAND
   Set tCurrent = $Get(^DeepSee.AuditCode)
-  Set tEndPosition = $Find(tCurrent,tCommand)
+  Set tEndPosition = $Find(tCurrent,pCommand)
   If 'tEndPosition Quit $$$OK
 
-  Set tStartPosition = tEndPosition-$Length(tCommand)
+  Set tStartPosition = tEndPosition-$Length(pCommand)
   Set tBefore = $ZSTRIP($Extract(tCurrent,1,tStartPosition-1),"<>W")
   Set tAfter = $ZSTRIP($Extract(tCurrent,tEndPosition,*),"<>W")
   Set tRemaining = tBefore_$Select((tBefore="")||(tAfter=""):"",1:" ")_tAfter
@@ -53,17 +57,17 @@ ClassMethod Record(pDashboard As %String)
   Quit:tDashboard=""
 
   Set tLockKey = $ZCONVERT(tDashboard,"U")
-  Lock +^CubeCacheWarmer.DashboardUsageLock(tLockKey):0
+  Lock +^DHABICCW.DashboardUsageLock(tLockKey):0
   Quit:'$TEST
 
   Try {
     Set tSC = $$$OK
     Set tNow = ..CurrentTimestamp()
-    If ##class(CubeCacheWarmer.Model.DashboardUsage).%ExistsId(tDashboard) {
-      Set tUsage = ##class(CubeCacheWarmer.Model.DashboardUsage).%OpenId(tDashboard,,.tSC)
+    If ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%ExistsId(tDashboard) {
+      Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%OpenId(tDashboard,,.tSC)
       If $$$ISERR(tSC) Quit
     } Else {
-      Set tUsage = ##class(CubeCacheWarmer.Model.DashboardUsage).%New()
+      Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%New()
       Set tUsage.DashboardName = tDashboard
       Set tUsage.OpenCount = 0
       Set tUsage.FirstOpenedAt = tNow
@@ -75,14 +79,14 @@ ClassMethod Record(pDashboard As %String)
     // Usage tracking must never make a dashboard request fail.
   }
 
-  Lock -^CubeCacheWarmer.DashboardUsageLock(tLockKey)
+  Lock -^DHABICCW.DashboardUsageLock(tLockKey)
   Quit
 }
 
 ClassMethod GetOpenCount(pDashboard As %String) As %Integer
 {
-  If '##class(CubeCacheWarmer.Model.DashboardUsage).%ExistsId(pDashboard) Quit 0
-  Set tUsage = ##class(CubeCacheWarmer.Model.DashboardUsage).%OpenId(pDashboard,,.tSC)
+  If '##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%ExistsId(pDashboard) Quit 0
+  Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%OpenId(pDashboard,,.tSC)
   If $$$ISERR(tSC) Quit 0
   If '$IsObject(tUsage) Quit 0
   Quit tUsage.OpenCount

@@ -1,8 +1,8 @@
 /// Persistent per-query statistics belonging to a cache-warming run.
-Class CubeCacheWarmer.Model.CacheWarmQuery Extends (%Persistent, %JSON.Adaptor)
+Class DHA.BI.CubeCacheWarmer.Model.CacheWarmQuery Extends (%Persistent, %JSON.Adaptor)
 {
 
-Relationship Run As CubeCacheWarmer.Model.CacheWarmRun [ Cardinality = parent, Inverse = Queries, Required ];
+Relationship Run As DHA.BI.CubeCacheWarmer.Model.CacheWarmRun [ Cardinality = parent, Inverse = Queries, Required ];
 
 /// Saved pivot name, or "Ad hoc MDX" for a direct MDX invocation.
 Property QueryName As %String(MAXLEN = 512);
@@ -91,9 +91,9 @@ Storage Default
 </Data>
 <DataLocation>{%%PARENT}("Queries")</DataLocation>
 <DefaultData>CacheWarmQueryDefaultData</DefaultData>
-<IdLocation>^CubeCacheWarmer.CacheWarmRunC("Queries")</IdLocation>
-<IndexLocation>^CubeCacheWarmer.CacheWarmQueryI</IndexLocation>
-<StreamLocation>^CubeCacheWarmer.CacheWarmQueryS</StreamLocation>
+<IdLocation>^DHABICCW.CacheWarmRunC("Queries")</IdLocation>
+<IndexLocation>^DHABICCW.CacheWarmQueryI</IndexLocation>
+<StreamLocation>^DHABICCW.CacheWarmQueryS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

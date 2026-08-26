@@ -42,7 +42,7 @@ The local development credentials are `_SYSTEM` / `SYS`. Bootstrap clears the fi
 - Put ObjectScript classes in `src/<package path>/ClassName.cls`.
 - Put unit tests in `tests/<package path>/TestName.cls`.
 - Reusable cache-warmer code and tests live under
-  `packages/iris-bi-cache-warmer/` rather than the application source tree.
+  `packages/dha-bi-cube-cache-warmer/` rather than the application source tree.
 - The container imports the cache-warmer package and `src/` each time it starts.
 - With the ObjectScript extension connected, saving a `.cls` file compiles it directly into `DISEASEREGISTRY`.
 - Run the smoke test with `./bin/test`.
@@ -118,17 +118,11 @@ You can inspect `^OBJ.DSTIME` between the two calls to see the pending source ID
 ### Configure automatic cache warming
 
 The application-neutral implementation is isolated in
-[`packages/iris-bi-cache-warmer`](packages/iris-bi-cache-warmer/README.md). That
+[`packages/dha-bi-cube-cache-warmer`](packages/dha-bi-cube-cache-warmer/README.md). That
 directory contains the `.cls` sources, tests, documentation, installer, and IPM
 `module.xml`; it can be copied into another repository without the Disease
 Registry demo. Run `./bin/package-cache-warmer` to create a versioned archive
 under the ignored `dist/` directory.
-
-On an existing development volume, bootstrap removes the former
-`DiseaseRegistry.Util.DashboardUsage` audit command before installing the new
-package hook. Legacy compiled classes and their old statistics may remain in the
-volume, but they are no longer called or included in source control; export any
-legacy history you need before deleting those definitions manually.
 
 The generated `DiseaseRegistry.CubeRegistry` is activated during bootstrap. It
 registers each cube in an enabled Cube Manager schedule group that runs every
@@ -144,11 +138,11 @@ The included registry uses the following Post-Build Code and Post-Synchronize
 Code for each cube:
 
 ```objectscript
-do ##class(CubeCacheWarmer.CacheWarmer).QueueCube("DiseaseRegistryPatients")
+do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube("DiseaseRegistryPatients")
 ```
 
 ```objectscript
-do ##class(CubeCacheWarmer.CacheWarmer).QueueCube("DiseaseRegistryDiagnoses")
+do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube("DiseaseRegistryDiagnoses")
 ```
 
 The warmer runs as a background job, waits until the cube is queryable, and
@@ -162,12 +156,12 @@ dashboard opens. Static values and `@` runtime settings are supported; runtime
 settings are evaluated in the worker's user/security context. Keeping the query
 workload in a separate process prevents slow MDX queries from extending the Cube
 Manager task. Summary outcomes are written to
-`DeepSeeTasks_DISEASEREGISTRY.log` with source label `CubeCache`.
+`DeepSeeTasks_DISEASEREGISTRY.log` with source label `DHABICCW`.
 
 Bootstrap installs IRIS BI's documented [`^DeepSee.AuditCode` dashboard-access
 hook](https://docs.intersystems.com/irisforhealthlatest/csp/docbook/DocBook.UI.Page.cls?KEY=D2IMP_ch_dev).
 Each dashboard open increments an aggregate row in
-`CubeCacheWarmer_Model.DashboardUsage`. The hook stores only the dashboard name,
+`DHA_BI_CubeCacheWarmer_Model.DashboardUsage`. The hook stores only the dashboard name,
 open count, and first/last timestamps; it does not store users, URLs, filter
 values, parameters, or query text. If another dashboard audit command is already
 configured, installation prepends the usage recorder and retains that command.
@@ -189,7 +183,7 @@ Inspect the automatically collected rankings with SQL:
 
 ```sql
 SELECT DashboardName, OpenCount, FirstOpenedAt, LastOpenedAt
-FROM CubeCacheWarmer_Model.DashboardUsage
+FROM DHA_BI_CubeCacheWarmer_Model.DashboardUsage
 ORDER BY OpenCount DESC, LastOpenedAt DESC
 ```
 
@@ -199,8 +193,8 @@ warming profiles for high-value combinations that differ from the saved opening
 defaults.
 
 Every queued, cube, pivot, and direct-MDX warming invocation also writes
-persistent history to `CubeCacheWarmer_Model.CacheWarmRun`, with one child row
-per query in `CubeCacheWarmer_Model.CacheWarmQuery`. The history contains query
+persistent history to `DHA_BI_CubeCacheWarmer_Model.CacheWarmRun`, with one child row
+per query in `DHA_BI_CubeCacheWarmer_Model.CacheWarmQuery`. The history contains query
 names, source type, dashboard/widget attribution, default-filter count,
 generated query keys, row and column counts, timings, and status. MDX text,
 parameter values, and filter values are deliberately not stored. Synchronous
@@ -214,7 +208,7 @@ Inspect recent runs with SQL:
 ```sql
 SELECT TOP 20 %ID, CubeName, Mode, Outcome, StartedAt, FinishedAt,
        TotalQueries, SucceededQueries, FailedQueries, ElapsedSeconds, StatusText
-FROM CubeCacheWarmer_Model.CacheWarmRun
+FROM DHA_BI_CubeCacheWarmer_Model.CacheWarmRun
 ORDER BY %ID DESC
 ```
 
@@ -225,14 +219,14 @@ SELECT QueryName, SourceType, DashboardName, WidgetName, DefaultFilterCount,
        DashboardOpenCount, PriorityOrder, CubeName, QueryKey,
        RowCount, ColumnCount, ElapsedSeconds,
        Success, StatusText
-FROM CubeCacheWarmer_Model.CacheWarmQuery
+FROM DHA_BI_CubeCacheWarmer_Model.CacheWarmQuery
 WHERE Run = 2
 ```
 
 History is not deleted automatically. To retain the most recent 30 days:
 
 ```objectscript
-set sc=##class(CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
+set sc=##class(DHA.BI.CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
 do $SYSTEM.OBJ.DisplayError(sc)
 write !,"Deleted runs: ",deleted,!
 ```
@@ -241,7 +235,7 @@ To execute an important MDX query that is not saved as a pivot:
 
 ```objectscript
 set mdx="SELECT {[Measures].[%Count]} ON 0, [Disease].[Disease Group].Members ON 1 FROM [DiseaseRegistryDiagnoses]"
-set sc=##class(CubeCacheWarmer.CacheWarmer).WarmMDX(mdx,.parameters,1,.stats)
+set sc=##class(DHA.BI.CubeCacheWarmer.CacheWarmer).WarmMDX(mdx,.parameters,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 zwrite stats
 ```
@@ -259,7 +253,7 @@ The bootstrap flow is:
 2. IRIS starts using durable `%SYS` at `/durable/config`.
 3. `iris-main --after` executes `docker/bootstrap.sh`.
 4. `docker/App.Installer.cls` creates the database and namespace when absent.
-5. The installer imports `packages/iris-bi-cache-warmer/src/`, installs its BI
+5. The installer imports `packages/dha-bi-cube-cache-warmer/src/`, installs its BI
    audit hook, and then imports the Disease Registry classes under `src/`.
 
 Before starting, `bin/start` also verifies that the configured SuperServer and Web Gateway host ports are not already occupied by another process.

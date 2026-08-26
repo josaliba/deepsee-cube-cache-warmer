@@ -1,4 +1,4 @@
-# IRIS BI Cube Cache Warmer
+# DHA.BI.CubeCacheWarmer
 
 Self-contained cache-warming package for InterSystems IRIS Business
 Intelligence. The package has no dependency on application-specific classes,
@@ -23,7 +23,7 @@ It provides:
 ## Package contents
 
 ```text
-src/CubeCacheWarmer/
+src/DHA/BI/CubeCacheWarmer/
 ├── CacheWarmer.cls
 ├── DashboardUsage.cls
 ├── Installer.cls
@@ -33,7 +33,7 @@ src/CubeCacheWarmer/
     └── DashboardUsage.cls
 ```
 
-The entire `iris-bi-cache-warmer` directory can be copied into another
+The entire `dha-bi-cube-cache-warmer` directory can be copied into another
 repository or archived for distribution.
 
 ## Install with InterSystems Package Manager
@@ -41,19 +41,19 @@ repository or archived for distribution.
 With an IPM client installed, run this from the target Analytics namespace:
 
 ```objectscript
-zpm "load /path/to/iris-bi-cache-warmer"
+zpm "load /path/to/dha-bi-cube-cache-warmer"
 ```
 
-The module loads the `CubeCacheWarmer` package and installs its dashboard-access
+The module loads the `DHA.BI.CubeCacheWarmer` package and installs its dashboard-access
 audit hook. If another `^DeepSee.AuditCode` command already exists, it is
 preserved and runs after the cache-warmer recorder.
 
 ## Install from the `.cls` sources
 
 ```objectscript
-set sc=$SYSTEM.OBJ.LoadDir("/path/to/iris-bi-cache-warmer/src","ck",,1)
+set sc=$SYSTEM.OBJ.LoadDir("/path/to/dha-bi-cube-cache-warmer/src","ck",,1)
 do $SYSTEM.OBJ.DisplayError(sc)
-set sc=##class(CubeCacheWarmer.Installer).Install()
+set sc=##class(DHA.BI.CubeCacheWarmer.Installer).Install()
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
@@ -63,7 +63,7 @@ Use the following as both the cube's Post-Build Code and Post-Synchronize Code,
 substituting its logical cube name:
 
 ```objectscript
-do ##class(CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
+do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
 ```
 
 The call starts a background process. It does not wait for all MDX queries to
@@ -74,7 +74,7 @@ finish in the Cube Manager task.
 Warm a cube synchronously:
 
 ```objectscript
-set sc=##class(CubeCacheWarmer.CacheWarmer).WarmCube("MyCube",0,1,.stats)
+set sc=##class(DHA.BI.CubeCacheWarmer.CacheWarmer).WarmCube("MyCube",0,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 zwrite stats
 ```
@@ -82,7 +82,7 @@ zwrite stats
 Warm one saved pivot:
 
 ```objectscript
-set sc=##class(CubeCacheWarmer.CacheWarmer).WarmPivot("Folder/My Pivot.pivot",.parameters,1,.stats)
+set sc=##class(DHA.BI.CubeCacheWarmer.CacheWarmer).WarmPivot("Folder/My Pivot.pivot",.parameters,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
@@ -91,7 +91,7 @@ do $SYSTEM.OBJ.DisplayError(sc)
 ```sql
 SELECT TOP 20 %ID, CubeName, Mode, Outcome, StartedAt, FinishedAt,
        TotalQueries, SucceededQueries, FailedQueries, ElapsedSeconds, StatusText
-FROM CubeCacheWarmer_Model.CacheWarmRun
+FROM DHA_BI_CubeCacheWarmer_Model.CacheWarmRun
 ORDER BY %ID DESC
 ```
 
@@ -99,20 +99,20 @@ ORDER BY %ID DESC
 SELECT QueryName, SourceType, DashboardName, WidgetName, DefaultFilterCount,
        DashboardOpenCount, PriorityOrder, CubeName, QueryKey,
        RowCount, ColumnCount, ElapsedSeconds, Success, StatusText
-FROM CubeCacheWarmer_Model.CacheWarmQuery
+FROM DHA_BI_CubeCacheWarmer_Model.CacheWarmQuery
 WHERE Run = :runId
 ```
 
 ```sql
 SELECT DashboardName, OpenCount, FirstOpenedAt, LastOpenedAt
-FROM CubeCacheWarmer_Model.DashboardUsage
+FROM DHA_BI_CubeCacheWarmer_Model.DashboardUsage
 ORDER BY OpenCount DESC, LastOpenedAt DESC
 ```
 
 Delete completed warmer history older than 30 days:
 
 ```objectscript
-set sc=##class(CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
+set sc=##class(DHA.BI.CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
 ```
 
 ## Uninstall
@@ -121,13 +121,13 @@ An IPM uninstall automatically removes the cache-warmer audit hook before
 removing the package:
 
 ```objectscript
-zpm "uninstall iris-bi-cache-warmer"
+zpm "uninstall DHA.BI.CubeCacheWarmer"
 ```
 
 For a source-based installation, remove the hook before deleting the classes:
 
 ```objectscript
-set sc=##class(CubeCacheWarmer.Installer).Uninstall()
+set sc=##class(DHA.BI.CubeCacheWarmer.Installer).Uninstall()
 ```
 
 This removes only the cache-warmer command. It does not delete persistent usage

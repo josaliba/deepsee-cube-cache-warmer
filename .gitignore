@@ -3,6 +3,7 @@
 .idea/
 .mcp.json
 .vscode/*.log
+.vscode/settings.json
 data/*
 !data/.gitkeep
 dist/
