@@ -1,0 +1,6 @@
+zn "%SYS"
+set sc=$SYSTEM.OBJ.Load("/opt/disease-registry/docker/App.Installer.cls","ck")
+if $SYSTEM.Status.IsError(sc) { do $SYSTEM.OBJ.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1) }
+set sc=##class(App.Installer).Bootstrap()
+if $SYSTEM.Status.IsError(sc) { do $SYSTEM.OBJ.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1) }
+halt
