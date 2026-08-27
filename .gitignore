@@ -1,0 +1,13 @@
+.DS_Store
+.env
+.idea/
+.mcp.json
+.vscode/*.log
+.vscode/settings.json
+data/*
+!data/.gitkeep
+dist/
+license/*
+!license/README.md
+*.log
+*.tmp

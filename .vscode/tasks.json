@@ -1,0 +1,39 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "IRIS: Build and start",
+      "type": "shell",
+      "command": "docker compose up --build -d",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "IRIS: Follow logs",
+      "type": "shell",
+      "command": "docker compose logs -f iris",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "IRIS: Terminal",
+      "type": "shell",
+      "command": "docker compose exec iris iris session IRIS -U DISEASEREGISTRY",
+      "problemMatcher": []
+    },
+    {
+      "label": "IRIS: Run tests",
+      "type": "shell",
+      "command": "./bin/test",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "IRIS: Stop",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": []
+    }
+  ]
+}
+

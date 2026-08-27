@@ -1,93 +1,163 @@
-# deepsee-cube-cache-warmer
+# DeepSee Cube Cache Warmer
 
+Popularity-aware cache warming for InterSystems IRIS Business Intelligence
+(formerly DeepSee). The reusable `DHA.BI.CubeCacheWarmer` package executes saved
+dashboard and pivot queries after cube builds or synchronizations so IRIS can
+repopulate its normal result cache before users open the dashboards.
 
+This repository contains both:
 
-## Getting started
+- a standalone, application-neutral cache-warmer package under
+  [`packages/dha-bi-cube-cache-warmer`](packages/dha-bi-cube-cache-warmer/README.md);
+  and
+- a complete Docker Compose disease-registry demo with two synchronized cubes,
+  saved pivots, a dashboard with default filters, tests, and operational helpers.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Features
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- Background warming from Cube Manager Post-Build and Post-Synchronize hooks.
+- Per-cube worker coalescing so duplicate hooks do not run the same workload
+  concurrently.
+- Cube-availability waiting before MDX execution.
+- Dashboard popularity tracking through IRIS BI's `^DeepSee.AuditCode` hook.
+- Dashboard ordering by observed opens, then BI `lastAccessed`, then name.
+- Saved base-pivot and dashboard-default query warming.
+- Support for subject areas, static defaults, `@` runtime settings, sets, and
+  `%NOT` filter values.
+- Persistent run and per-query history without storing MDX, parameters, filter
+  values, URLs, or usernames.
+- Direct APIs for warming a cube, pivot, or arbitrary MDX.
+- IPM and source-based deployment options.
 
-## Add your files
+## Repository layout
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+```text
+packages/dha-bi-cube-cache-warmer/  Standalone package, tests, and module.xml
+src/DiseaseRegistry/                Demo models, cubes, registry, and helpers
+tests/DiseaseRegistry/              Demo smoke and cube-registry tests
+docker/                             Fresh-volume bootstrap and installer
+bin/                                Start, stop, test, terminal, and package scripts
+docs/                               Demo, architecture, deployment, and operations guides
 ```
-cd existing_repo
-git remote add origin https://gitlab.iscinternal.com/jsaliba/deepsee-cube-cache-warmer.git
-git branch -M main
-git push -uf origin main
+
+## Quick start
+
+### Prerequisites
+
+- Docker Desktop with Docker Compose v2
+- Git
+- Access to `containers.intersystems.com`
+- A valid IRIS for Health license key
+
+Clone the repository and enter it:
+
+```bash
+git clone git@gitlab.iscinternal.com:jsaliba/deepsee-cube-cache-warmer.git
+cd deepsee-cube-cache-warmer
 ```
 
-## Integrate with your tools
+Authenticate to the InterSystems Container Registry if needed, copy the license
+to `license/iris.key`, and start the stack:
 
-* [Set up project integrations](https://gitlab.iscinternal.com/jsaliba/deepsee-cube-cache-warmer/-/settings/integrations)
+```bash
+docker login containers.intersystems.com
+./bin/start
+./bin/logs
+```
 
-## Collaborate with your team
+The start command returns after the containers start; first-time IRIS bootstrap
+continues asynchronously. Wait until the logs show:
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+```text
+Disease Registry bootstrap complete.
+```
 
-## Test and Deploy
+Then open an IRIS terminal and create the deterministic demo:
 
-Use the built-in continuous integration in GitLab.
+```bash
+./bin/terminal
+```
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+```objectscript
+set sc=##class(DiseaseRegistry.Util.Analytics).SetupDemo(50,500,1,1)
+do $SYSTEM.OBJ.DisplayError(sc)
+```
 
-***
+This creates 50 patients and 500 diagnoses, builds both cubes, creates two saved
+pivots and one dashboard, and warms three queries.
 
-# Editing this README
+Run all package and application tests:
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+```bash
+./bin/test
+```
 
-## Suggestions for a good README
+Local endpoints and development credentials:
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+- Management Portal: <http://localhost:52773/csp/sys/UtilHome.csp>
+- IRIS SuperServer: `localhost:1972`
+- Namespace: `DISEASEREGISTRY`
+- Development user: `_SYSTEM`
+- Development password: `SYS`
 
-## Name
-Choose a self-explaining name for your project.
+These credentials and the HTTP-only Web Gateway configuration are intended only
+for an isolated development workstation.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## Documentation
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+- [Install and run the demo](docs/demo.md)
+- [Architecture and execution flow](docs/architecture.md)
+- [Deploy and upgrade the standalone package](docs/deployment.md)
+- [Operate, monitor, and troubleshoot the warmer](docs/operations.md)
+- [Standalone package reference](packages/dha-bi-cube-cache-warmer/README.md)
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+## Build the distributable package
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+Create a versioned archive from the version in `module.xml`:
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+./bin/package-cache-warmer
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+The script writes an ignored archive such as:
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```text
+dist/dha-bi-cube-cache-warmer-1.0.0.tar.gz
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+See [deployment.md](docs/deployment.md) for IPM installation, source-based
+installation, Cube Manager configuration, upgrade, verification, and uninstall
+instructions.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+## Common development commands
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```bash
+./bin/start                    # Build and start the demo stack
+./bin/logs                     # Follow IRIS/bootstrap logs
+./bin/terminal                 # Open DISEASEREGISTRY ObjectScript terminal
+./bin/test                     # Compile and run package and demo tests
+./bin/package-cache-warmer     # Create the standalone package archive
+./bin/stop                     # Stop containers and preserve their volumes
+docker compose down -v         # Delete containers and all local demo data
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+The final command permanently deletes the project's IRIS and Web Gateway named
+volumes. Use it only when a completely fresh installation is required.
 
-## License
-For open source projects, say how it is licensed.
+## Configuration and security
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Copy `.env.example` to `.env` to override image tags or host ports. Pin the IRIS
+and Web Gateway images to matching explicit versions before using the demo as a
+long-lived environment.
+
+The license file, `.env`, generated archives, runtime data, and local editor
+settings are excluded from Git. Do not commit credentials or license material.
+
+Before production deployment, review authentication, TLS, authorization,
+licensing, auditing, backups, data retention, resource limits, and applicable
+healthcare privacy requirements. Cache warming consumes CPU and I/O; deploy a
+deliberate workload rather than attempting to warm every possible user filter.
+
+No external redistribution license is included in this repository. Add or
+confirm the license required by your organization before publishing the package
+outside its intended environment.

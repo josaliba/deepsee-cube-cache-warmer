@@ -1,0 +1,74 @@
+name: disease-registry
+
+services:
+  iris-volume-init:
+    image: disease-registry-iris:dev
+    container_name: disease-registry-iris-volume-init
+    user: "0:0"
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - mkdir -p /durable/config /durable/databases && chown -R 51773:51773 /durable
+    restart: "no"
+    volumes:
+      - iris-data:/durable
+
+  iris:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        IRIS_IMAGE: ${IRIS_IMAGE:-containers.intersystems.com/intersystems/irishealth:latest-em}
+    image: disease-registry-iris:dev
+    container_name: disease-registry-iris
+    hostname: disease-registry
+    init: true
+    restart: unless-stopped
+    depends_on:
+      iris-volume-init:
+        condition: service_completed_successfully
+    command:
+      - --key
+      - /license/iris.key
+      - --check-caps
+      - "false"
+      - --after
+      - /opt/disease-registry/docker/bootstrap.sh
+    environment:
+      ISC_DATA_DIRECTORY: /durable/config
+      ISC_CPF_MERGE_FILE: /opt/disease-registry/docker/merge.cpf
+    ports:
+      - "${IRIS_SUPERSERVER_PORT:-1972}:1972"
+    volumes:
+      - iris-data:/durable
+      - ./license/iris.key:/license/iris.key:ro
+      - ./src:/workspace/src:ro
+      - ./tests:/workspace/tests:ro
+      - ./packages:/workspace/packages:ro
+
+  webgateway:
+    image: ${WEBGATEWAY_IMAGE:-containers.intersystems.com/intersystems/webgateway:latest-em}
+    container_name: disease-registry-webgateway
+    hostname: disease-registry-webgateway
+    init: true
+    restart: unless-stopped
+    depends_on:
+      iris:
+        condition: service_started
+    environment:
+      ISC_DATA_DIRECTORY: /durable
+      ISC_CSP_INI_FILE: /config/CSP.ini
+      ISC_CSP_CONF_FILE: /config/CSP.conf
+    ports:
+      - "${IRIS_WEB_PORT:-52773}:80"
+    volumes:
+      - webgateway-data:/durable
+      - ./webgateway/CSP.ini:/config/CSP.ini:ro
+      - ./webgateway/CSP.conf:/config/CSP.conf:ro
+
+volumes:
+  iris-data:
+    name: disease-registry-iris-data
+  webgateway-data:
+    name: disease-registry-webgateway-data
