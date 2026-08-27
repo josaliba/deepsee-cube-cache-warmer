@@ -26,18 +26,12 @@ ClassMethod WarmWhenAvailable(pCubeName As %String, pWaitSeconds As %Integer = 6
 {
   Set tRunId = 0
   Set tHistorySC = ..StartRun(pCubeName,"QueuedCube",.tRunId)
-  If $$$ISERR(tHistorySC) Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+  Do ..LogStatusError("Unable to start cache-warming history: ",tHistorySC)
 
   Set tKey = $ZCONVERT(pCubeName,"U")
   Lock +^DHABICCW.CacheWarmerLock("cube",tKey):0
   If '$TEST {
-    Do ..InitializeStats(pCubeName,.tStats)
-    Set tStats("finished") = ..CurrentTimestamp()
-    Set tStats("runId") = tRunId
-    If tRunId {
-      Set tHistorySC = ..FinishRun(tRunId,.tStats,$$$OK,"Skipped","Another worker was already warming this cube")
-      If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
-    }
+    Do ..FinishEmptyRun(pCubeName,tRunId,0,$$$OK,"Skipped","Another worker was already warming this cube",.tStats)
     Quit $$$OK
   }
 
@@ -49,29 +43,12 @@ ClassMethod WarmWhenAvailable(pCubeName As %String, pWaitSeconds As %Integer = 6
     If $$$ISOK(tSC) {
       Set tSC = ..WarmCube(pCubeName,pStopOnError,pVerbose,.tStats,tRunId,"QueuedCube")
       Set tRunFinished = 1
-    } Else {
-      Do ..InitializeStats(pCubeName,.tStats)
-      Set tStats("finished") = ..CurrentTimestamp()
-      Set tStats("elapsedTime") = $ZH-tStart
-      Set tStats("runId") = tRunId
-      If tRunId {
-        Set tHistorySC = ..FinishRun(tRunId,.tStats,tSC)
-        If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
-      }
-      Set tRunFinished = 1
     }
   } Catch ex {
     Set tSC = ex.AsStatus()
   }
 
-  If ('tRunFinished),(tRunId) {
-    Do ..InitializeStats(pCubeName,.tStats)
-    Set tStats("finished") = ..CurrentTimestamp()
-    Set tStats("elapsedTime") = $ZH-tStart
-    Set tStats("runId") = tRunId
-    Set tHistorySC = ..FinishRun(tRunId,.tStats,tSC)
-    If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
-  }
+  If 'tRunFinished Do ..FinishEmptyRun(pCubeName,tRunId,$ZH-tStart,tSC,"","",.tStats)
 
   Lock -^DHABICCW.CacheWarmerLock("cube",tKey)
   If $$$ISERR(tSC) {
@@ -105,13 +82,7 @@ ClassMethod WaitUntilAvailable(pCubeName As %String, pWaitSeconds As %Integer = 
 ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbose As %Boolean = 1, Output pStats = "", pRunId As %Integer = 0, pMode As %String = "DirectCube") As %Status
 {
   Do ..InitializeStats(pCubeName,.pStats)
-  If 'pRunId {
-    Set tHistorySC = ..StartRun(pCubeName,pMode,.pRunId)
-    If $$$ISERR(tHistorySC) {
-      Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
-      Set pRunId = -1
-    }
-  }
+  If 'pRunId Do ..StartRunBestEffort(pCubeName,pMode,.pRunId)
   Set pStats("runId") = $Select(pRunId>0:pRunId,1:0)
   Set tStart = $ZH
   Set tSC = $$$OK
@@ -206,20 +177,14 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
 
           Set tDashboardOpenCount = tPivots(tPriorityOrder,tPivotName,tPivotId)
           If tPriorityOrder<1000000 Set pStats("prioritizedPivots") = pStats("prioritizedPivots")+1
-          Set pStats("total") = pStats("total")+1
           Kill tParameters,tQueryStats
           Set tMDX = tPivot.%GetBaseMDX()
           Set tQuerySC = ..WarmMDX(tMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tPivotName,"BasePivot","","",0,tDashboardOpenCount,$Select(tPriorityOrder<1000000:tPriorityOrder,1:0))
-          Merge pStats("queries",tPivotName) = tQueryStats
-          Set pStats("queries",tPivotName,"status") = tQuerySC
+          Do ..RecordQueryResult(tPivotName,.tQueryStats,tQuerySC,.pStats,.tOverallSC)
 
           If $$$ISERR(tQuerySC) {
-            Set pStats("failed") = pStats("failed")+1
-            Set tOverallSC = $System.Status.AppendStatus(tOverallSC,tQuerySC)
             Do ..Log("Cache warming failed for "_tPivotName_": "_$System.Status.GetErrorText(tQuerySC))
             If pStopOnError Set tStopped = 1
-          } Else {
-            Set pStats("succeeded") = pStats("succeeded")+1
           }
         }
       }
@@ -236,7 +201,7 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
   Set pStats("elapsedTime") = $ZH-tStart
   If pRunId>0 {
     Set tHistorySC = ..FinishRun(pRunId,.pStats,tSC)
-    If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+    Do ..LogStatusError("Unable to finish cache-warming history: ",tHistorySC)
   }
   If pVerbose Write !,"Cache warming for [",pCubeName,"]: ",pStats("succeeded")," succeeded, ",pStats("failed")," failed",!
   Quit tSC
@@ -246,13 +211,8 @@ ClassMethod WarmPivot(pPivotName As %String, ByRef pParameters, pVerbose As %Boo
 {
   Do ..InitializeStats("",.pStats)
   Set tStart = $ZH
-  Set tRunId = 0
   Set tQuerySaved = 0
-  Set tHistorySC = ..StartRun("","DirectPivot",.tRunId)
-  If $$$ISERR(tHistorySC) {
-    Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
-    Set tRunId = -1
-  }
+  Do ..StartRunBestEffort("","DirectPivot",.tRunId)
   Set pStats("runId") = $Select(tRunId>0:tRunId,1:0)
   Set tSC = $$$OK
 
@@ -276,18 +236,14 @@ ClassMethod WarmPivot(pPivotName As %String, ByRef pParameters, pVerbose As %Boo
     Set tSC = ex.AsStatus()
   }
 
-  Set pStats("total") = 1
-  Set pStats("succeeded") = $Select($$$ISOK(tSC):1,1:0)
-  Set pStats("failed") = $Select($$$ISERR(tSC):1,1:0)
-  Set pStats("finished") = ..CurrentTimestamp()
-  Set pStats("elapsedTime") = $ZH-tStart
+  Do ..FinishSingleQueryStats(tStart,tSC,.pStats)
   If (tRunId>0),('tQuerySaved) {
     Set tHistorySC = ..SaveQuery(tRunId,pPivotName,.pStats,tSC,"Pivot")
-    If $$$ISERR(tHistorySC) Do ..Log("Unable to save cache-warming query history: "_$System.Status.GetErrorText(tHistorySC))
+    Do ..LogStatusError("Unable to save cache-warming query history: ",tHistorySC)
   }
   If tRunId>0 {
     Set tHistorySC = ..FinishRun(tRunId,.pStats,tSC)
-    If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+    Do ..LogStatusError("Unable to finish cache-warming history: ",tHistorySC)
   }
   Quit tSC
 }
@@ -313,12 +269,8 @@ ClassMethod ApplyDefaultFilters(pMDX As %String, ByRef pFilters, Output pFiltere
   If $$$ISERR($Get(tSC,$$$OK)) Quit tSC
   If pFilterCount = 0 Quit $$$OK
 
-  Set tClause = ""
-  For i = 1:1:pFilterCount-1 {
-    Set tClause = tClause_"NONEMPTYCROSSJOIN("_tTerms(i)_","
-  }
-  Set tClause = tClause_tTerms(pFilterCount)
-  For i = 1:1:pFilterCount-1 Set tClause = tClause_")"
+  Set tClause = tTerms(pFilterCount)
+  For i = pFilterCount-1:-1:1 Set tClause = "NONEMPTYCROSSJOIN("_tTerms(i)_","_tClause_")"
   Set pFilteredMDX = pMDX_" %FILTER "_tClause
   Quit $$$OK
 }
@@ -328,13 +280,7 @@ ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1
 {
   Do ..InitializeStats("",.pStats)
   Set tOwnRun = (pRunId=0)
-  If tOwnRun {
-    Set tHistorySC = ..StartRun("","DirectMDX",.pRunId)
-    If $$$ISERR(tHistorySC) {
-      Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
-      Set pRunId = -1
-    }
-  }
+  If tOwnRun Do ..StartRunBestEffort("","DirectMDX",.pRunId)
   Set pStats("runId") = $Select(pRunId>0:pRunId,1:0)
   Set tStart = $ZH
   Set tSC = $$$OK
@@ -360,22 +306,18 @@ ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1
     Set tSC = ex.AsStatus()
   }
 
-  Set pStats("elapsedTime") = $ZH-tStart
-  Set pStats("finished") = ..CurrentTimestamp()
-  Set pStats("total") = 1
-  Set pStats("succeeded") = $Select($$$ISOK(tSC):1,1:0)
-  Set pStats("failed") = $Select($$$ISERR(tSC):1,1:0)
+  Do ..FinishSingleQueryStats(tStart,tSC,.pStats)
   If (pRunId>0),(pStats("cube")'="") {
     Set tHistorySC = ..UpdateRunCube(pRunId,pStats("cube"))
-    If $$$ISERR(tHistorySC) Do ..Log("Unable to update cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+    Do ..LogStatusError("Unable to update cache-warming history: ",tHistorySC)
   }
   If pRunId>0 {
     Set tHistorySC = ..SaveQuery(pRunId,pQueryName,.pStats,tSC,pSourceType,pDashboardName,pWidgetName,pDefaultFilterCount,pDashboardOpenCount,pPriorityOrder)
-    If $$$ISERR(tHistorySC) Do ..Log("Unable to save cache-warming query history: "_$System.Status.GetErrorText(tHistorySC))
+    Do ..LogStatusError("Unable to save cache-warming query history: ",tHistorySC)
   }
   If (tOwnRun),(pRunId>0) {
     Set tHistorySC = ..FinishRun(pRunId,.pStats,tSC)
-    If $$$ISERR(tHistorySC) Do ..Log("Unable to finish cache-warming history: "_$System.Status.GetErrorText(tHistorySC))
+    Do ..LogStatusError("Unable to finish cache-warming history: ",tHistorySC)
   }
   If pVerbose,$$$ISOK(tSC) Write !,"Warmed ",pStats("queryKey")," on [",pStats("cube"),"] in ",pStats("elapsedTime")," seconds",!
   Set tResult = ""
@@ -391,7 +333,6 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
   Set pStopped = 0
   Kill pWarmedPivots
   Set tOverallSC = $$$OK
-  Set tCursorOpen = 0
   Set tDashboardRank = 0
 
   &sql(DECLARE DHABICubeCacheWarmerDashboards CURSOR FOR
@@ -401,7 +342,6 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
     ORDER BY COALESCE(u.OpenCount,0) DESC, d.lastAccessed DESC, d.fullName)
   &sql(OPEN DHABICubeCacheWarmerDashboards)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate dashboards. SQLCODE="_SQLCODE_" "_$Get(%msg))
-  Set tCursorOpen = 1
 
   For {
     &sql(FETCH DHABICubeCacheWarmerDashboards INTO :tDashboardId,:tDashboardOpenCount)
@@ -507,21 +447,15 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
       Set tPivotKey = $ZCONVERT(tPivot.fullName,"U")
       If '$Data(pWarmedPivots(tPivotKey)) {
         Set pWarmedPivots(tPivotKey) = ""
-        Set pStats("total") = pStats("total")+1
         Set pStats("dashboardBaseQueries") = pStats("dashboardBaseQueries")+1
         Set pStats("prioritizedPivots") = pStats("prioritizedPivots")+1
         Kill tParameters,tQueryStats
         Set tBaseQuerySC = ..WarmMDX(tPivot.%GetBaseMDX(),.tParameters,pVerbose,.tQueryStats,pRunId,tPivot.fullName,"DashboardBase",tDashboard.fullName,tWidgetName(tWidgetIndexNumber),0,tDashboardOpenCount,tDashboardRank)
-        Merge pStats("queries",tPivot.fullName) = tQueryStats
-        Set pStats("queries",tPivot.fullName,"status") = tBaseQuerySC
+        Do ..RecordQueryResult(tPivot.fullName,.tQueryStats,tBaseQuerySC,.pStats,.tOverallSC)
 
         If $$$ISERR(tBaseQuerySC) {
-          Set pStats("failed") = pStats("failed")+1
-          Set tOverallSC = $System.Status.AppendStatus(tOverallSC,tBaseQuerySC)
           Do ..Log("Dashboard base-pivot warming failed for "_tPivot.fullName_": "_$System.Status.GetErrorText(tBaseQuerySC))
           If pStopOnError Set pStopped = 1
-        } Else {
-          Set pStats("succeeded") = pStats("succeeded")+1
         }
       }
       Quit:pStopped
@@ -561,29 +495,21 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
       Continue:tDefaultFilterCount=0
 
       Set tQueryName = "Dashboard "_tDashboard.fullName_" / "_tWidgetName(tWidgetIndexNumber)_" [defaults]"
-      Set pStats("total") = pStats("total")+1
       Set pStats("dashboardDefaults") = pStats("dashboardDefaults")+1
       Kill tParameters,tQueryStats
       Set tQuerySC = ..WarmMDX(tFilteredMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tQueryName,"DashboardDefault",tDashboard.fullName,tWidgetName(tWidgetIndexNumber),tDefaultFilterCount,tDashboardOpenCount,tDashboardRank)
-      Merge pStats("queries",tQueryName) = tQueryStats
-      Set pStats("queries",tQueryName,"status") = tQuerySC
+      Do ..RecordQueryResult(tQueryName,.tQueryStats,tQuerySC,.pStats,.tOverallSC)
 
       If $$$ISERR(tQuerySC) {
-        Set pStats("failed") = pStats("failed")+1
-        Set tOverallSC = $System.Status.AppendStatus(tOverallSC,tQuerySC)
         Do ..Log("Dashboard-default warming failed for "_tQueryName_": "_$System.Status.GetErrorText(tQuerySC))
         If pStopOnError Set pStopped = 1
-      } Else {
-        Set pStats("succeeded") = pStats("succeeded")+1
       }
     }
     Quit:pStopped
   }
 
   Set tFetchCode = SQLCODE
-  If tCursorOpen {
-    &sql(CLOSE DHABICubeCacheWarmerDashboards)
-  }
+  &sql(CLOSE DHABICubeCacheWarmerDashboards)
   If ('pStopped),(tFetchCode<0) Quit $$$ERROR($$$GeneralError,"Error while enumerating dashboards. SQLCODE="_tFetchCode_" "_$Get(%msg))
   Quit tOverallSC
 }
@@ -661,14 +587,12 @@ ClassMethod PurgeHistory(pDaysToKeep As %Integer = 30, Output pDeleted As %Integ
   Set tCutoffH = ($Piece(tNowH,",",1)-pDaysToKeep)_","_$Piece(tNowH,",",2)
   Set tCutoff = $ZDATETIME(tCutoffH,3,1,6)
   Set tSC = $$$OK
-  Set tCursorOpen = 0
 
   &sql(DECLARE DHABICubeCacheWarmerOldRuns CURSOR FOR
     SELECT %ID FROM DHA_BI_CubeCacheWarmer_Model.CacheWarmRun
     WHERE StartedAt < :tCutoff AND Outcome <> 'Running')
   &sql(OPEN DHABICubeCacheWarmerOldRuns)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate cache-warming history. SQLCODE="_SQLCODE_" "_$Get(%msg))
-  Set tCursorOpen = 1
 
   For {
     &sql(FETCH DHABICubeCacheWarmerOldRuns INTO :tRunId)
@@ -678,28 +602,64 @@ ClassMethod PurgeHistory(pDaysToKeep As %Integer = 30, Output pDeleted As %Integ
     Set pDeleted = pDeleted+1
   }
   Set tFetchCode = SQLCODE
-  If tCursorOpen {
-    &sql(CLOSE DHABICubeCacheWarmerOldRuns)
-  }
+  &sql(CLOSE DHABICubeCacheWarmerOldRuns)
   If $$$ISERR(tSC) Quit tSC
   If tFetchCode < 0 Quit $$$ERROR($$$GeneralError,"Unable to fetch cache-warming history. SQLCODE="_tFetchCode_" "_$Get(%msg))
   Quit $$$OK
+}
+
+ClassMethod FinishSingleQueryStats(pStart As %Double, pSC As %Status, ByRef pStats) [ Private ]
+{
+  Set pStats("elapsedTime") = $ZH-pStart
+  Set pStats("finished") = ..CurrentTimestamp()
+  Set pStats("total") = 1
+  Set pStats("succeeded") = $Select($$$ISOK(pSC):1,1:0)
+  Set pStats("failed") = $Select($$$ISERR(pSC):1,1:0)
+}
+
+ClassMethod RecordQueryResult(pQueryName As %String, ByRef pQueryStats, pQuerySC As %Status, ByRef pStats, ByRef pOverallSC) [ Private ]
+{
+  Set pStats("total") = pStats("total")+1
+  Merge pStats("queries",pQueryName) = pQueryStats
+  Set pStats("queries",pQueryName,"status") = pQuerySC
+  If $$$ISERR(pQuerySC) {
+    Set pStats("failed") = pStats("failed")+1
+    Set pOverallSC = $System.Status.AppendStatus(pOverallSC,pQuerySC)
+  } Else {
+    Set pStats("succeeded") = pStats("succeeded")+1
+  }
 }
 
 ClassMethod InitializeStats(pCubeName As %String, Output pStats) [ Private ]
 {
   Kill pStats
   Set pStats("cube") = pCubeName
-  Set pStats("total") = 0
-  Set pStats("succeeded") = 0
-  Set pStats("failed") = 0
-  Set pStats("enumerationErrors") = 0
-  Set pStats("dashboardDefaults") = 0
-  Set pStats("dashboardBaseQueries") = 0
-  Set pStats("priorityDashboards") = 0
-  Set pStats("prioritizedPivots") = 0
+  Set pStats("total") = 0, pStats("succeeded") = 0, pStats("failed") = 0
+  Set pStats("enumerationErrors") = 0, pStats("dashboardDefaults") = 0, pStats("dashboardBaseQueries") = 0
+  Set pStats("priorityDashboards") = 0, pStats("prioritizedPivots") = 0
   Set pStats("started") = ..CurrentTimestamp()
   Set pStats("elapsedTime") = 0
+}
+
+ClassMethod StartRunBestEffort(pCubeName As %String, pMode As %String, Output pRunId As %Integer) [ Private ]
+{
+  Set tSC = ..StartRun(pCubeName,pMode,.pRunId)
+  If $$$ISERR(tSC) {
+    Do ..Log("Unable to start cache-warming history: "_$System.Status.GetErrorText(tSC))
+    Set pRunId = -1
+  }
+}
+
+ClassMethod FinishEmptyRun(pCubeName As %String, pRunId As %Integer, pElapsedSeconds As %Double, pSC As %Status, pOutcome As %String, pStatusText As %String, Output pStats) [ Private ]
+{
+  Do ..InitializeStats(pCubeName,.pStats)
+  Set pStats("finished") = ..CurrentTimestamp()
+  Set pStats("elapsedTime") = pElapsedSeconds
+  Set pStats("runId") = pRunId
+  If pRunId>0 {
+    Set tHistorySC = ..FinishRun(pRunId,.pStats,pSC,pOutcome,pStatusText)
+    Do ..LogStatusError("Unable to finish cache-warming history: ",tHistorySC)
+  }
 }
 
 ClassMethod StartRun(pCubeName As %String, pMode As %String, Output pRunId As %Integer) As %Status [ Private ]
@@ -778,6 +738,11 @@ ClassMethod FinishRun(pRunId As %Integer, ByRef pStats, pSC As %Status, pOutcome
 ClassMethod CurrentTimestamp() As %TimeStamp [ Private ]
 {
   Quit $ZDATETIME($ZTIMESTAMP,3,1,6)
+}
+
+ClassMethod LogStatusError(pPrefix As %String, pSC As %Status) [ Private ]
+{
+  If $$$ISERR(pSC) Do ..Log(pPrefix_$System.Status.GetErrorText(pSC))
 }
 
 ClassMethod Log(pMessage As %String) As %Status [ Private ]

@@ -57,11 +57,13 @@ ClassMethod Record(pDashboard As %String)
   Quit:tDashboard=""
 
   Set tLockKey = $ZCONVERT(tDashboard,"U")
+  // Usage tracking is intentionally best-effort: if another process is already
+  // recording this dashboard, do not delay the dashboard request. That open is
+  // not counted because the zero-timeout lock fails and $TEST remains false.
   Lock +^DHABICCW.DashboardUsageLock(tLockKey):0
   Quit:'$TEST
 
   Try {
-    Set tSC = $$$OK
     Set tNow = ..CurrentTimestamp()
     If ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%ExistsId(tDashboard) {
       Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%OpenId(tDashboard,,.tSC)
@@ -85,7 +87,6 @@ ClassMethod Record(pDashboard As %String)
 
 ClassMethod GetOpenCount(pDashboard As %String) As %Integer
 {
-  If '##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%ExistsId(pDashboard) Quit 0
   Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%OpenId(pDashboard,,.tSC)
   If $$$ISERR(tSC) Quit 0
   If '$IsObject(tUsage) Quit 0
