@@ -13,6 +13,78 @@ This repository contains both:
 - a complete Docker Compose disease-registry demo with two synchronized cubes,
   saved pivots, a dashboard with default filters, tests, and operational helpers.
 
+## How it works
+
+```mermaid
+flowchart TD
+    A[Cube build or synchronization] --> B[Post-Build or Post-Synchronize hook]
+    B --> C[QueueCube]
+    C --> D[Background IRIS job]
+    D --> E[Create QueuedCube history row]
+    E --> F{Per-cube lock available?}
+    F -- No --> G[Finish as Skipped]
+    F -- Yes --> H[Wait until cube is queryable]
+    H --> I[WarmCube]
+
+    J[Direct application call] --> I
+    J --> K[WarmPivot]
+    J --> L[WarmMDX]
+
+    M[Dashboard open] --> N[BI audit hook]
+    N --> O[(DashboardUsage)]
+    O --> P[Popularity ordering]
+
+    I --> P
+    P --> Q[Warm dashboard base pivots]
+    P --> R[Warm saved-default variants]
+    I --> S[Warm remaining pivots]
+    Q --> L
+    R --> L
+    S --> L
+    K --> L
+    L --> T[IRIS BI ExecuteDirect]
+    T --> U[(IRIS BI result cache)]
+    T --> V[(CacheWarmQuery history)]
+    I --> W[(CacheWarmRun history)]
+```
+
+### Execution summary
+
+1. After a cube build or synchronization, Cube Manager queues a background
+   warmer:
+
+   ```objectscript
+   do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
+   ```
+
+   Requests for the same cube are coalesced so concurrent hooks do not start
+   overlapping warmers.
+2. The worker waits until the cube is queryable. Running separately prevents
+   warming from delaying Cube Manager or starting before the cube operation has
+   fully finalized.
+3. The warmer discovers saved dashboards and pivots for the cube and its
+   matching subject areas. Dashboards are prioritized by usage: the
+   `^DeepSee.AuditCode` hook records dashboard opens, so frequently used
+   dashboards run first. IRIS BI's existing `lastAccessed` timestamp and the
+   dashboard name provide fallback ordering.
+4. For each matching dashboard, the warmer executes the underlying saved pivot
+   and, when applicable, a second query containing its saved default filters.
+   Remaining saved pivots run afterward, while a case-insensitive in-memory set
+   prevents duplicate base-pivot execution.
+5. Executing the MDX through IRIS BI's standard result-set API repopulates its
+   normal query cache, allowing compatible dashboard requests to reuse the
+   cached results.
+6. Every run and individual query result is saved persistently with timing,
+   success or failure, row and column counts, dashboard priority, and query
+   type:
+
+   - `DHA_BI_CubeCacheWarmer_Model.CacheWarmRun`
+   - `DHA_BI_CubeCacheWarmer_Model.CacheWarmQuery`
+   - `DHA_BI_CubeCacheWarmer_Model.DashboardUsage`
+
+See [Architecture and execution flow](docs/architecture.md) for the detailed
+behavior of each path, including concurrency, dashboard ranking, and outcomes.
+
 ## Features
 
 - Background warming from Cube Manager Post-Build and Post-Synchronize hooks.
