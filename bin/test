@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+docker compose exec -T iris iris session IRIS -U DISEASEREGISTRY <<'OBJECTSCRIPT'
+set ^UnitTestRoot="/workspace/packages/dha-bi-cube-cache-warmer/tests"
+set sc=##class(%UnitTest.Manager).RunTest("DHA/BI/CubeCacheWarmer/Test","/loadud")
+if $SYSTEM.Status.IsError(sc) { do $SYSTEM.OBJ.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1) }
+set ^UnitTestRoot="/workspace/tests"
+set sc=##class(%UnitTest.Manager).RunTest("DiseaseRegistry/Test","/loadud")
+if $SYSTEM.Status.IsError(sc) { do $SYSTEM.OBJ.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1) }
+halt
+OBJECTSCRIPT
