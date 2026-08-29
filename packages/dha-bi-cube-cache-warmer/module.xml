@@ -3,8 +3,8 @@
   <Document name="DHA.BI.CubeCacheWarmer.ZPM">
     <Module>
       <Name>DHA.BI.CubeCacheWarmer</Name>
-      <Description>Popularity-aware cache warming for InterSystems IRIS Business Intelligence cubes and dashboards.</Description>
-      <Version>1.0.0</Version>
+      <Description>True query-frequency-ordered cache warming for InterSystems IRIS Business Intelligence cubes and dashboards.</Description>
+      <Version>1.1.0</Version>
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
       <Resource Name="DHA.BI.CubeCacheWarmer.PKG"/>

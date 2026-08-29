@@ -1,6 +1,6 @@
 # DeepSee Cube Cache Warmer
 
-Popularity-aware cache warming for InterSystems IRIS Business Intelligence
+True query-frequency-aware cache warming for InterSystems IRIS Business Intelligence
 (formerly DeepSee). The reusable `DHA.BI.CubeCacheWarmer` package executes saved
 dashboard and pivot queries after cube builds or synchronizations so IRIS can
 repopulate its normal result cache before users open the dashboards.
@@ -30,14 +30,19 @@ flowchart TD
     J --> K[WarmPivot]
     J --> L[WarmMDX]
 
-    M[Dashboard open] --> N[BI audit hook]
-    N --> O[(DashboardUsage)]
-    O --> P[Popularity ordering]
-
+    M[User BI query] --> N[Query audit hook]
+    N --> O[(QueryUsage frequency)]
+    O --> P[True query-frequency ordering]
     I --> P
-    P --> Q[Warm dashboard base pivots]
-    P --> R[Warm saved-default variants]
+    P --> X[Replay most-called queries]
+
+    Y[Dashboard open] --> Z[Dashboard audit hook]
+    Z --> AA[(DashboardUsage fallback)]
+    AA --> Q
+    P --> Q[Warm remaining dashboard base pivots]
+    P --> R[Warm remaining saved-default variants]
     I --> S[Warm remaining pivots]
+    X --> L
     Q --> L
     R --> L
     S --> L
@@ -62,12 +67,13 @@ flowchart TD
 2. The worker waits until the cube is queryable. Running separately prevents
    warming from delaying Cube Manager or starting before the cube operation has
    fully finalized.
-3. The warmer discovers saved dashboards and pivots for the cube and its
-   matching subject areas. Dashboards are prioritized by usage: the
-   `^DeepSee.AuditCode` hook records dashboard opens, so frequently used
-   dashboards run first. IRIS BI's existing `lastAccessed` timestamp and the
-   dashboard name provide fallback ordering.
-4. For each matching dashboard, the warmer executes the underlying saved pivot
+3. IRIS BI's `^DeepSee.AuditQueryCode` hook consumes new native
+   `^DeepSee.QueryLog` entries and counts each normalized user query once.
+   The warmer first replays distinct queries in descending real execution
+   count, using last-executed time as the tie breaker. Its own replays are
+   explicitly excluded, preventing a frequency feedback loop.
+4. The warmer then discovers saved dashboards and pivots not already covered
+   by those query keys. For each matching dashboard, it executes the saved pivot
    and, when applicable, a second query containing its saved default filters.
    Remaining saved pivots run afterward, while a case-insensitive in-memory set
    prevents duplicate base-pivot execution.
@@ -75,12 +81,13 @@ flowchart TD
    normal query cache, allowing compatible dashboard requests to reuse the
    cached results.
 6. Every run and individual query result is saved persistently with timing,
-   success or failure, row and column counts, dashboard priority, and query
-   type:
+   success or failure, row and column counts, real query frequency, actual
+   execution order, dashboard attribution, and query type:
 
    - `DHA_BI_CubeCacheWarmer_Model.CacheWarmRun`
    - `DHA_BI_CubeCacheWarmer_Model.CacheWarmQuery`
    - `DHA_BI_CubeCacheWarmer_Model.DashboardUsage`
+   - `DHA_BI_CubeCacheWarmer_Model.QueryUsage`
 
 See [Architecture and execution flow](docs/architecture.md) for the detailed
 behavior of each path, including concurrency, dashboard ranking, and outcomes.
@@ -91,13 +98,14 @@ behavior of each path, including concurrency, dashboard ranking, and outcomes.
 - Per-cube worker coalescing so duplicate hooks do not run the same workload
   concurrently.
 - Cube-availability waiting before MDX execution.
-- Dashboard popularity tracking through IRIS BI's `^DeepSee.AuditCode` hook.
-- Dashboard ordering by observed opens, then BI `lastAccessed`, then name.
+- True normalized-query frequency tracking through `^DeepSee.AuditQueryCode`.
+- Most-called-query-first execution, with recency as a deterministic tie breaker.
+- Dashboard-open and `lastAccessed` ordering as the zero-frequency fallback.
 - Saved base-pivot and dashboard-default query warming.
 - Support for subject areas, static defaults, `@` runtime settings, sets, and
   `%NOT` filter values.
-- Persistent run and per-query history without storing MDX, parameters, filter
-  values, URLs, or usernames.
+- Persistent run history plus replayable query-frequency data. Query usage
+  stores resolved MDX, so its access and retention must be treated accordingly.
 - Direct APIs for warming a cube, pivot, or arbitrary MDX.
 - IPM and source-based deployment options.
 
@@ -195,7 +203,7 @@ Create a versioned archive from the version in `module.xml`:
 The script writes an ignored archive such as:
 
 ```text
-dist/dha-bi-cube-cache-warmer-1.0.0.tar.gz
+dist/dha-bi-cube-cache-warmer-1.1.0.tar.gz
 ```
 
 See [deployment.md](docs/deployment.md) for IPM installation, source-based

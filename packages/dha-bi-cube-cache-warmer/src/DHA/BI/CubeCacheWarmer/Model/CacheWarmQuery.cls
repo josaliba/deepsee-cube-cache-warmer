@@ -7,7 +7,7 @@ Relationship Run As DHA.BI.CubeCacheWarmer.Model.CacheWarmRun [ Cardinality = pa
 /// Saved pivot name, or "Ad hoc MDX" for a direct MDX invocation.
 Property QueryName As %String(MAXLEN = 512);
 
-/// BasePivot, DashboardBase, DashboardDefault, Pivot, or AdHocMDX.
+/// QueryFrequency, BasePivot, DashboardBase, DashboardDefault, Pivot, or AdHocMDX.
 Property SourceType As %String(MAXLEN = 32);
 
 /// Dashboard and widget attribution for a DashboardDefault query.
@@ -21,8 +21,11 @@ Property DefaultFilterCount As %Integer [ InitialExpression = 0 ];
 /// Dashboard-open count observed when this query was prioritized.
 Property DashboardOpenCount As %Integer [ InitialExpression = 0 ];
 
-/// Dashboard popularity rank used for this query; zero means unranked.
+/// Actual execution order within the cache-warming run; zero for direct calls.
 Property PriorityOrder As %Integer [ InitialExpression = 0 ];
+
+/// Real user execution count used to rank this query; zero means no observations.
+Property QueryFrequency As %Integer [ InitialExpression = 0 ];
 
 Property CubeName As %String(MAXLEN = 128);
 
@@ -87,6 +90,9 @@ Storage Default
 </Value>
 <Value name="15">
 <Value>PriorityOrder</Value>
+</Value>
+<Value name="16">
+<Value>QueryFrequency</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Queries")</DataLocation>

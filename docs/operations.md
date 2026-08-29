@@ -57,6 +57,7 @@ SELECT Run AS RunId,
        WidgetName,
        DefaultFilterCount,
        DashboardOpenCount,
+       QueryFrequency,
        PriorityOrder,
        CubeName,
        QueryKey,
@@ -77,6 +78,33 @@ ORDER BY PriorityOrder, QueryName
 Successful query rows should have `Success=1`, `StatusText='OK'`, and normally a
 generated `QueryKey`. Row or column counts can legitimately be zero for an empty
 result.
+
+Rows with `SourceType='QueryFrequency'` appear first. Their `QueryFrequency`
+values must be non-increasing as `PriorityOrder` increases.
+
+## Inspect true query frequency
+
+```sql
+SELECT CubeName,
+       QueryKey,
+       ExecutionCount,
+       FirstExecutedAt,
+       LastExecutedAt
+FROM DHA_BI_CubeCacheWarmer_Model.QueryUsage
+ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey
+```
+
+Seed existing native history once when installing into an established
+namespace:
+
+```objectscript
+set sc=##class(DHA.BI.CubeCacheWarmer.QueryUsage).ImportQueryLog(1,.imported)
+do $SYSTEM.OBJ.DisplayError(sc)
+write !,"Imported executions: ",imported,!
+```
+
+The reset form replaces collected counts. Query usage includes replayable MDX;
+apply suitable SQL privileges and retention controls.
 
 ## Find query failures
 
@@ -131,7 +159,7 @@ A stale `Running` row can indicate that an IRIS process was terminated before
 history finalization. Confirm the process state and BI logs before changing
 history.
 
-## Inspect dashboard priority
+## Inspect dashboard fallback priority
 
 ```sql
 SELECT DashboardName,
@@ -263,9 +291,10 @@ Confirm that:
 
 ### Dashboard usage remains empty
 
-Confirm `^DeepSee.AuditCode` contains the package recorder, then open the saved
+Confirm `^DeepSee.AuditCode` contains the dashboard recorder and
+`^DeepSee.AuditQueryCode` contains the query recorder, then execute the saved
 dashboard through IRIS BI. Creating or editing a dashboard does not count as an
-open.
+open or a query execution.
 
 ### `EnumerationErrors` is nonzero
 

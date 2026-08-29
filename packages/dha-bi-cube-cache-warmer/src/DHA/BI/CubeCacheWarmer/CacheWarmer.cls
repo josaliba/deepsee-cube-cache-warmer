@@ -96,10 +96,19 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
     Set tTarget = $ZCONVERT(pCubeName,"U")
     Set tTargetIsSubjectArea = (##class(%DeepSee.Utils).%GetBaseCube(pCubeName)'="")
 
-    // Complete dashboard opening query sequences run first, ordered by recorded
-    // open count. The same saved base pivot is executed only once.
-    Kill tWarmedPivots
-    Set tDashboardSC = ..WarmDashboardQueries(pCubeName,tTarget,tTargetIsSubjectArea,pStopOnError,pVerbose,pRunId,.pStats,.tDashboardStopped,.tWarmedPivots)
+    // Execute observed queries in true user-frequency order before any fallback
+    // dashboard or pivot candidates. The audit recorder excludes these replays.
+    Kill tWarmedPivots,tWarmedQueryKeys
+    Set tPopularSC = ..WarmPopularQueries(pCubeName,tTarget,tTargetIsSubjectArea,pStopOnError,pVerbose,pRunId,.pStats,.tPopularStopped,.tWarmedQueryKeys)
+    If $$$ISERR(tPopularSC) Set tOverallSC = $System.Status.AppendStatus(tOverallSC,tPopularSC)
+    If tPopularStopped Set tStopped = 1
+    If tStopped {
+      Set tSC = tOverallSC
+      Quit
+    }
+
+    // Dashboard and saved-pivot discovery remains as the zero-frequency fallback.
+    Set tDashboardSC = ..WarmDashboardQueries(pCubeName,tTarget,tTargetIsSubjectArea,pStopOnError,pVerbose,pRunId,.pStats,.tDashboardStopped,.tWarmedPivots,.tWarmedQueryKeys)
     If $$$ISERR(tDashboardSC) Set tOverallSC = $System.Status.AppendStatus(tOverallSC,tDashboardSC)
     If tDashboardStopped Set tStopped = 1
     If tStopped {
@@ -179,7 +188,10 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
           If tPriorityOrder<1000000 Set pStats("prioritizedPivots") = pStats("prioritizedPivots")+1
           Kill tParameters,tQueryStats
           Set tMDX = tPivot.%GetBaseMDX()
-          Set tQuerySC = ..WarmMDX(tMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tPivotName,"BasePivot","","",0,tDashboardOpenCount,$Select(tPriorityOrder<1000000:tPriorityOrder,1:0))
+          Set tIdentitySC = ..GetQueryIdentity(tMDX,.tCandidateKey,.tCandidateCube)
+          If $$$ISOK(tIdentitySC),$Data(tWarmedQueryKeys(tCandidateKey)) Continue
+          Set tQuerySC = ..WarmMDX(tMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tPivotName,"BasePivot","","",0,tDashboardOpenCount,pStats("total")+1)
+          If $Get(tQueryStats("queryKey"))'="" Set tWarmedQueryKeys(tQueryStats("queryKey")) = ""
           Do ..RecordQueryResult(tPivotName,.tQueryStats,tQuerySC,.pStats,.tOverallSC)
 
           If $$$ISERR(tQuerySC) {
@@ -276,7 +288,7 @@ ClassMethod ApplyDefaultFilters(pMDX As %String, ByRef pFilters, Output pFiltere
 }
 
 /// Execute arbitrary MDX synchronously. Result caching is enabled by default.
-ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1, Output pStats = "", pRunId As %Integer = 0, pQueryName As %String = "Ad hoc MDX", pSourceType As %String = "AdHocMDX", pDashboardName As %String = "", pWidgetName As %String = "", pDefaultFilterCount As %Integer = 0, pDashboardOpenCount As %Integer = 0, pPriorityOrder As %Integer = 0) As %Status
+ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1, Output pStats = "", pRunId As %Integer = 0, pQueryName As %String = "Ad hoc MDX", pSourceType As %String = "AdHocMDX", pDashboardName As %String = "", pWidgetName As %String = "", pDefaultFilterCount As %Integer = 0, pDashboardOpenCount As %Integer = 0, pPriorityOrder As %Integer = 0, pQueryFrequency As %Integer = 0) As %Status
 {
   Do ..InitializeStats("",.pStats)
   Set tOwnRun = (pRunId=0)
@@ -285,13 +297,19 @@ ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1
   Set tStart = $ZH
   Set tSC = $$$OK
   Set tResult = ""
+  Set tAuditSuppressed = 0
 
   Try {
     If pMDX = "" {
       Set tSC = $$$ERROR($$$GeneralError,"An MDX query is required")
       Quit
     }
+    Set ^||DHABICCW.CacheWarmer("active") = $Get(^||DHABICCW.CacheWarmer("active"))+1
+    Set tAuditSuppressed = 1
     Set tResult = ##class(%DeepSee.ResultSet).%ExecuteDirect(pMDX,.pParameters,.tSC)
+    Set ^||DHABICCW.CacheWarmer("active") = ^||DHABICCW.CacheWarmer("active")-1
+    If ^||DHABICCW.CacheWarmer("active")<1 Kill ^||DHABICCW.CacheWarmer("active")
+    Set tAuditSuppressed = 0
     If $$$ISERR(tSC) Quit
     If '$IsObject(tResult) {
       Set tSC = $$$ERROR($$$GeneralError,"The query did not return a result set")
@@ -303,6 +321,10 @@ ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1
     Set pStats("rows") = tResult.%GetRowCount()
     Set pStats("columns") = tResult.%GetColumnCount()
   } Catch ex {
+    If tAuditSuppressed,$Get(^||DHABICCW.CacheWarmer("active"))>0 {
+      Set ^||DHABICCW.CacheWarmer("active") = ^||DHABICCW.CacheWarmer("active")-1
+      If ^||DHABICCW.CacheWarmer("active")<1 Kill ^||DHABICCW.CacheWarmer("active")
+    }
     Set tSC = ex.AsStatus()
   }
 
@@ -312,7 +334,7 @@ ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1
     Do ..LogStatusError("Unable to update cache-warming history: ",tHistorySC)
   }
   If pRunId>0 {
-    Set tHistorySC = ..SaveQuery(pRunId,pQueryName,.pStats,tSC,pSourceType,pDashboardName,pWidgetName,pDefaultFilterCount,pDashboardOpenCount,pPriorityOrder)
+    Set tHistorySC = ..SaveQuery(pRunId,pQueryName,.pStats,tSC,pSourceType,pDashboardName,pWidgetName,pDefaultFilterCount,pDashboardOpenCount,pPriorityOrder,pQueryFrequency)
     Do ..LogStatusError("Unable to save cache-warming query history: ",tHistorySC)
   }
   If (tOwnRun),(pRunId>0) {
@@ -324,11 +346,73 @@ ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1
   Quit tSC
 }
 
+/// Execute previously observed user queries in descending execution-frequency
+/// order. Recency and query key provide deterministic tie breakers.
+ClassMethod WarmPopularQueries(pCubeName As %String, pTarget As %String, pTargetIsSubjectArea As %Boolean, pStopOnError As %Boolean, pVerbose As %Boolean, pRunId As %Integer, ByRef pStats, Output pStopped As %Boolean, Output pWarmedQueryKeys) As %Status [ Private ]
+{
+  Set pStopped = 0
+  Kill pWarmedQueryKeys
+  Set tOverallSC = $$$OK
+  Set tFrequencyRank = 0
+
+  &sql(DECLARE DHABICubeCacheWarmerFrequency CURSOR FOR
+    SELECT QueryKey, CubeName, MDX, ExecutionCount
+    FROM DHA_BI_CubeCacheWarmer_Model.QueryUsage
+    WHERE ExecutionCount > 0
+    ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey)
+  &sql(OPEN DHABICubeCacheWarmerFrequency)
+  If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate query frequency. SQLCODE="_SQLCODE_" "_$Get(%msg))
+
+  For {
+    &sql(FETCH DHABICubeCacheWarmerFrequency INTO :tQueryKey,:tQueryCube,:tMDX,:tFrequency)
+    Quit:SQLCODE'=0
+    Set tQueryBase = ##class(%DeepSee.Utils).%GetBaseCube(tQueryCube)
+    If tQueryBase = "" Set tQueryBase = tQueryCube
+    Set tMatches = $Select(pTargetIsSubjectArea:$ZCONVERT(tQueryCube,"U")=pTarget,1:$ZCONVERT(tQueryBase,"U")=pTarget)
+    Continue:'tMatches
+    Continue:tMDX=""
+    Continue:$Data(pWarmedQueryKeys(tQueryKey))
+
+    Set tFrequencyRank = tFrequencyRank+1
+    Kill tParameters,tQueryStats
+    Set tQueryName = "Frequency #"_tFrequencyRank_" ["_tQueryKey_"]"
+    Set tQuerySC = ..WarmMDX(tMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tQueryName,"QueryFrequency","","",0,0,tFrequencyRank,tFrequency)
+    If $Get(tQueryStats("queryKey"))'="" Set pWarmedQueryKeys(tQueryStats("queryKey")) = ""
+    Do ..RecordQueryResult(tQueryName,.tQueryStats,tQuerySC,.pStats,.tOverallSC)
+    Set pStats("frequencyQueries") = pStats("frequencyQueries")+1
+
+    If $$$ISERR(tQuerySC) {
+      Do ..Log("Frequency-ordered warming failed for "_tQueryKey_": "_$System.Status.GetErrorText(tQuerySC))
+      If pStopOnError Set pStopped = 1
+    }
+    Quit:pStopped
+  }
+
+  Set tFetchCode = SQLCODE
+  &sql(CLOSE DHABICubeCacheWarmerFrequency)
+  If ('pStopped),(tFetchCode<0) Quit $$$ERROR($$$GeneralError,"Error while enumerating query frequency. SQLCODE="_tFetchCode_" "_$Get(%msg))
+  Quit tOverallSC
+}
+
+/// Prepare without executing so duplicate candidates can be recognized before
+/// they are added to the cache or to execution history.
+ClassMethod GetQueryIdentity(pMDX As %String, Output pQueryKey As %String, Output pCubeName As %String) As %Status [ Private ]
+{
+  Set pQueryKey = "", pCubeName = ""
+  Kill tVariables
+  Set tResult = ##class(%DeepSee.ResultSet).%New()
+  Set tSC = tResult.%PrepareMDX(pMDX,.tVariables,.tResolvedMDX)
+  If $$$ISERR(tSC) Quit tSC
+  Set pQueryKey = tResult.%GetQueryKey()
+  Set pCubeName = tResult.%GetCubeName()
+  Quit $$$OK
+}
+
 /// Warm each dashboard's saved base pivots and default-filter variants.
 /// Dashboards are ordered by recorded opens, then by IRIS BI's last-accessed
 /// timestamp. pWarmedPivots prevents repeated base queries when dashboards share
 /// a saved pivot and lets the caller run unreferenced pivots afterwards.
-ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTargetIsSubjectArea As %Boolean, pStopOnError As %Boolean, pVerbose As %Boolean, pRunId As %Integer, ByRef pStats, Output pStopped As %Boolean, Output pWarmedPivots) As %Status [ Private ]
+ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTargetIsSubjectArea As %Boolean, pStopOnError As %Boolean, pVerbose As %Boolean, pRunId As %Integer, ByRef pStats, Output pStopped As %Boolean, Output pWarmedPivots, ByRef pWarmedQueryKeys) As %Status [ Private ]
 {
   Set pStopped = 0
   Kill pWarmedPivots
@@ -447,15 +531,20 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
       Set tPivotKey = $ZCONVERT(tPivot.fullName,"U")
       If '$Data(pWarmedPivots(tPivotKey)) {
         Set pWarmedPivots(tPivotKey) = ""
-        Set pStats("dashboardBaseQueries") = pStats("dashboardBaseQueries")+1
-        Set pStats("prioritizedPivots") = pStats("prioritizedPivots")+1
-        Kill tParameters,tQueryStats
-        Set tBaseQuerySC = ..WarmMDX(tPivot.%GetBaseMDX(),.tParameters,pVerbose,.tQueryStats,pRunId,tPivot.fullName,"DashboardBase",tDashboard.fullName,tWidgetName(tWidgetIndexNumber),0,tDashboardOpenCount,tDashboardRank)
-        Do ..RecordQueryResult(tPivot.fullName,.tQueryStats,tBaseQuerySC,.pStats,.tOverallSC)
+        Set tBaseMDX = tPivot.%GetBaseMDX()
+        Set tIdentitySC = ..GetQueryIdentity(tBaseMDX,.tCandidateKey,.tCandidateCube)
+        If $$$ISERR(tIdentitySC)||'$Data(pWarmedQueryKeys(tCandidateKey)) {
+          Set pStats("dashboardBaseQueries") = pStats("dashboardBaseQueries")+1
+          Set pStats("prioritizedPivots") = pStats("prioritizedPivots")+1
+          Kill tParameters,tQueryStats
+          Set tBaseQuerySC = ..WarmMDX(tBaseMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tPivot.fullName,"DashboardBase",tDashboard.fullName,tWidgetName(tWidgetIndexNumber),0,tDashboardOpenCount,pStats("total")+1)
+          If $Get(tQueryStats("queryKey"))'="" Set pWarmedQueryKeys(tQueryStats("queryKey")) = ""
+          Do ..RecordQueryResult(tPivot.fullName,.tQueryStats,tBaseQuerySC,.pStats,.tOverallSC)
 
-        If $$$ISERR(tBaseQuerySC) {
-          Do ..Log("Dashboard base-pivot warming failed for "_tPivot.fullName_": "_$System.Status.GetErrorText(tBaseQuerySC))
-          If pStopOnError Set pStopped = 1
+          If $$$ISERR(tBaseQuerySC) {
+            Do ..Log("Dashboard base-pivot warming failed for "_tPivot.fullName_": "_$System.Status.GetErrorText(tBaseQuerySC))
+            If pStopOnError Set pStopped = 1
+          }
         }
       }
       Quit:pStopped
@@ -495,9 +584,12 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
       Continue:tDefaultFilterCount=0
 
       Set tQueryName = "Dashboard "_tDashboard.fullName_" / "_tWidgetName(tWidgetIndexNumber)_" [defaults]"
+      Set tIdentitySC = ..GetQueryIdentity(tFilteredMDX,.tCandidateKey,.tCandidateCube)
+      Continue:$$$ISOK(tIdentitySC)&&$Data(pWarmedQueryKeys(tCandidateKey))
       Set pStats("dashboardDefaults") = pStats("dashboardDefaults")+1
       Kill tParameters,tQueryStats
-      Set tQuerySC = ..WarmMDX(tFilteredMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tQueryName,"DashboardDefault",tDashboard.fullName,tWidgetName(tWidgetIndexNumber),tDefaultFilterCount,tDashboardOpenCount,tDashboardRank)
+      Set tQuerySC = ..WarmMDX(tFilteredMDX,.tParameters,pVerbose,.tQueryStats,pRunId,tQueryName,"DashboardDefault",tDashboard.fullName,tWidgetName(tWidgetIndexNumber),tDefaultFilterCount,tDashboardOpenCount,pStats("total")+1)
+      If $Get(tQueryStats("queryKey"))'="" Set pWarmedQueryKeys(tQueryStats("queryKey")) = ""
       Do ..RecordQueryResult(tQueryName,.tQueryStats,tQuerySC,.pStats,.tOverallSC)
 
       If $$$ISERR(tQuerySC) {
@@ -637,6 +729,7 @@ ClassMethod InitializeStats(pCubeName As %String, Output pStats) [ Private ]
   Set pStats("total") = 0, pStats("succeeded") = 0, pStats("failed") = 0
   Set pStats("enumerationErrors") = 0, pStats("dashboardDefaults") = 0, pStats("dashboardBaseQueries") = 0
   Set pStats("priorityDashboards") = 0, pStats("prioritizedPivots") = 0
+  Set pStats("frequencyQueries") = 0
   Set pStats("started") = ..CurrentTimestamp()
   Set pStats("elapsedTime") = 0
 }
@@ -686,7 +779,7 @@ ClassMethod UpdateRunCube(pRunId As %Integer, pCubeName As %String) As %Status [
   Quit tRun.%Save()
 }
 
-ClassMethod SaveQuery(pRunId As %Integer, pQueryName As %String, ByRef pStats, pSC As %Status, pSourceType As %String = "AdHocMDX", pDashboardName As %String = "", pWidgetName As %String = "", pDefaultFilterCount As %Integer = 0, pDashboardOpenCount As %Integer = 0, pPriorityOrder As %Integer = 0) As %Status [ Private ]
+ClassMethod SaveQuery(pRunId As %Integer, pQueryName As %String, ByRef pStats, pSC As %Status, pSourceType As %String = "AdHocMDX", pDashboardName As %String = "", pWidgetName As %String = "", pDefaultFilterCount As %Integer = 0, pDashboardOpenCount As %Integer = 0, pPriorityOrder As %Integer = 0, pQueryFrequency As %Integer = 0) As %Status [ Private ]
 {
   If pRunId < 1 Quit $$$OK
   Set tRun = ##class(DHA.BI.CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
@@ -702,6 +795,7 @@ ClassMethod SaveQuery(pRunId As %Integer, pQueryName As %String, ByRef pStats, p
   Set tQuery.DefaultFilterCount = pDefaultFilterCount
   Set tQuery.DashboardOpenCount = pDashboardOpenCount
   Set tQuery.PriorityOrder = pPriorityOrder
+  Set tQuery.QueryFrequency = pQueryFrequency
   Set tQuery.CubeName = $Extract($Get(pStats("cube")),1,128)
   Set tQuery.QueryKey = $Extract($Get(pStats("queryKey")),1,128)
   Set tQuery.RowCount = $Get(pStats("rows"),0)

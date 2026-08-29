@@ -91,7 +91,7 @@ Bootstrap performs the following work:
 4. Imports and compiles `DHA.BI.CubeCacheWarmer`.
 5. Imports and compiles the demo application.
 6. Activates `DiseaseRegistry.CubeRegistry` and updater tasks.
-7. Installs the dashboard-usage audit hook.
+7. Installs the dashboard-open and normalized-query-frequency audit hooks.
 
 ## Open the development environment
 
@@ -181,6 +181,18 @@ ORDER BY %ID DESC
 The final demo runs should include successful `DirectCube` entries for both
 cubes. `QueuedCube` entries with `Skipped` are expected when Post-Build and
 Post-Synchronize hooks queue workers for the same cube at nearly the same time.
+
+After exercising dashboards and pivots, inspect the real frequency source:
+
+```sql
+SELECT CubeName, QueryKey, ExecutionCount, LastExecutedAt
+FROM DHA_BI_CubeCacheWarmer_Model.QueryUsage
+ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey
+```
+
+Run `WarmCube()` again and inspect `CacheWarmQuery` ordered by `PriorityOrder`.
+Rows with `SourceType='QueryFrequency'` must come first with non-increasing
+`QueryFrequency`; remaining dashboard and pivot candidates follow as fallback.
 
 See [operations.md](operations.md) for complete monitoring queries and outcome
 interpretation.

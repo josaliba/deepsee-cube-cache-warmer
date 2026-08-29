@@ -8,8 +8,9 @@ It provides:
 
 - queued post-build and post-synchronization warming;
 - duplicate-job coalescing and cube-availability waiting;
-- automatic dashboard popularity tracking through `^DeepSee.AuditCode`;
-- popularity-ordered saved dashboard and pivot execution;
+- automatic native `^DeepSee.QueryLog` frequency tracking through
+  `^DeepSee.AuditQueryCode`;
+- true query-frequency-ordered execution, with dashboards and pivots as fallback;
 - dashboard default-filter support;
 - persistent run and per-query statistics; and
 - history retention utilities.
@@ -27,10 +28,12 @@ src/DHA/BI/CubeCacheWarmer/
 ├── CacheWarmer.cls
 ├── DashboardUsage.cls
 ├── Installer.cls
+├── QueryUsage.cls
 └── Model/
     ├── CacheWarmQuery.cls
     ├── CacheWarmRun.cls
-    └── DashboardUsage.cls
+    ├── DashboardUsage.cls
+    └── QueryUsage.cls
 ```
 
 The entire `dha-bi-cube-cache-warmer` directory can be copied into another
@@ -44,9 +47,9 @@ With an IPM client installed, run this from the target Analytics namespace:
 zpm "load /path/to/dha-bi-cube-cache-warmer"
 ```
 
-The module loads the `DHA.BI.CubeCacheWarmer` package and installs its dashboard-access
-audit hook. If another `^DeepSee.AuditCode` command already exists, it is
-preserved and runs after the cache-warmer recorder.
+The module installs both the dashboard-access and query-execution audit hooks.
+Existing commands in `^DeepSee.AuditCode` and `^DeepSee.AuditQueryCode` are
+preserved and run after the cache-warmer recorders.
 
 ## Install from the `.cls` sources
 
@@ -97,7 +100,7 @@ ORDER BY %ID DESC
 
 ```sql
 SELECT QueryName, SourceType, DashboardName, WidgetName, DefaultFilterCount,
-       DashboardOpenCount, PriorityOrder, CubeName, QueryKey,
+       DashboardOpenCount, QueryFrequency, PriorityOrder, CubeName, QueryKey,
        RowCount, ColumnCount, ElapsedSeconds, Success, StatusText
 FROM DHA_BI_CubeCacheWarmer_Model.CacheWarmQuery
 WHERE Run = :runId
@@ -109,6 +112,26 @@ FROM DHA_BI_CubeCacheWarmer_Model.DashboardUsage
 ORDER BY OpenCount DESC, LastOpenedAt DESC
 ```
 
+Inspect the true query-frequency order used by the next warm run:
+
+```sql
+SELECT CubeName, QueryKey, ExecutionCount, FirstExecutedAt, LastExecutedAt
+FROM DHA_BI_CubeCacheWarmer_Model.QueryUsage
+ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey
+```
+
+To seed the frequency table once from existing native query-log history:
+
+```objectscript
+set sc=##class(DHA.BI.CubeCacheWarmer.QueryUsage).ImportQueryLog(1,.imported)
+do $SYSTEM.OBJ.DisplayError(sc)
+write imported," historical executions imported",!
+```
+
+`pReset=1` replaces the package's collected frequency data. Do not run this
+repeatedly without resetting, because each import intentionally counts every
+entry currently present in `^DeepSee.QueryLog`.
+
 Delete completed warmer history older than 30 days:
 
 ```objectscript
@@ -117,26 +140,32 @@ set sc=##class(DHA.BI.CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
 
 ## Uninstall
 
-An IPM uninstall automatically removes the cache-warmer audit hook before
+An IPM uninstall automatically removes both cache-warmer audit hooks before
 removing the package:
 
 ```objectscript
 zpm "uninstall DHA.BI.CubeCacheWarmer"
 ```
 
-For a source-based installation, remove the hook before deleting the classes:
+For a source-based installation, remove both hooks before deleting the classes:
 
 ```objectscript
 set sc=##class(DHA.BI.CubeCacheWarmer.Installer).Uninstall()
 ```
 
-This removes only the cache-warmer command. It does not delete persistent usage
+This removes only the cache-warmer commands. It does not delete persistent usage
 or execution history.
 
 ## Operational notes
 
-- Popularity counts begin when the audit hook is installed. Existing dashboard
-  `lastAccessed` timestamps provide the initial fallback order.
+- Query counts begin when the query-audit hook is installed. A one-time
+  `ImportQueryLog()` can seed existing history. Every distinct normalized query
+  is ordered by real execution count, then recency; saved dashboard queries and
+  remaining pivots run afterwards when they were not already covered.
+- The warmer marks its process while replaying MDX, so its own executions never
+  increase `ExecutionCount` and cannot create a frequency feedback loop.
+- Query-frequency tracking persists the resolved MDX required for replay. Treat
+  this table as potentially sensitive when filter members contain business data.
 - Dashboard usage records contain dashboard name, count, and timestamps only.
   Usernames, MDX, filter values, URL parameters, and query parameters are not
   stored.

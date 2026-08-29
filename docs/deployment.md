@@ -10,11 +10,12 @@ or the demo's Cube Manager registry.
 - A namespace enabled for IRIS Business Intelligence/Analytics.
 - Saved pivots or dashboards for the logical cubes to warm.
 - An installation identity allowed to import and compile classes, create the
-  package's persistent tables, and update `^DeepSee.AuditCode`.
+  package's persistent tables, and update `^DeepSee.AuditCode` and
+  `^DeepSee.AuditQueryCode`.
 - A runtime identity allowed to query the cubes and execute the saved MDX.
 
 Install the package separately into every namespace where it will be used. Its
-classes, persistent history, dashboard usage, audit hook, and locks are
+classes, persistent history, dashboard/query usage, both audit hooks, and locks are
 namespace-scoped.
 
 ## Build the artifact
@@ -63,6 +64,7 @@ The IPM module:
 2. Compiles its persistent models.
 3. Calls `DHA.BI.CubeCacheWarmer.Installer.Install()`.
 4. Prepends the dashboard-usage recorder to `^DeepSee.AuditCode` if absent.
+5. Prepends the query-frequency recorder to `^DeepSee.AuditQueryCode` if absent.
 
 An existing audit command is preserved and runs after the recorder.
 
@@ -109,16 +111,18 @@ Confirm that the classes exist:
 write ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).%ClassName(1),!
 ```
 
-Confirm that the audit hook is installed:
+Confirm that both audit hooks are installed:
 
 ```objectscript
 write $get(^DeepSee.AuditCode),!
+write $get(^DeepSee.AuditQueryCode),!
 ```
 
 It should contain:
 
 ```objectscript
 do ##class(DHA.BI.CubeCacheWarmer.DashboardUsage).Record(%dsDashboard)
+do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).RecordAudit()
 ```
 
 Warm one cube synchronously during validation:
@@ -142,6 +146,27 @@ ORDER BY %ID DESC
 A valid deployment should produce query rows with `Success=1` and populated
 `QueryKey` values. `TotalQueries=0` is valid when the cube has no matching saved
 pivots or dashboards.
+
+For an established namespace, optionally seed historical counts once from the
+native query log before the first production warm run:
+
+```objectscript
+set sc=##class(DHA.BI.CubeCacheWarmer.QueryUsage).ImportQueryLog(1,.imported)
+do $SYSTEM.OBJ.DisplayError(sc)
+write imported," executions imported",!
+```
+
+Then verify the ranking source:
+
+```sql
+SELECT CubeName, QueryKey, ExecutionCount, FirstExecutedAt, LastExecutedAt
+FROM DHA_BI_CubeCacheWarmer_Model.QueryUsage
+ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey
+```
+
+The query audit hook maintains this table after installation and excludes the
+warmer's own executions. The model stores resolved MDX for replay, so restrict
+its SQL permissions and retention according to local data policy.
 
 ## Runtime permissions and identity
 
@@ -184,8 +209,8 @@ zpm "load /path/to/dha-bi-cube-cache-warmer"
 ```
 
 For a source installation, import the new `src` directory with compile flags and
-call `Installer.Install()` again. The installer leaves an existing audit hook in
-place and does not duplicate it.
+call `Installer.Install()` again. The installer preserves existing dashboard
+and query audit commands and does not duplicate its own commands.
 
 Before upgrading production:
 
@@ -193,7 +218,7 @@ Before upgrading production:
 2. Back up the target database according to local policy.
 3. Test against the deployed IRIS version.
 4. Validate a direct cube run.
-5. Confirm Cube Manager hooks and dashboard auditing afterward.
+5. Confirm Cube Manager hooks and dashboard/query auditing afterward.
 
 ## Uninstall
 
@@ -203,7 +228,7 @@ IPM invokes the package cleanup hook automatically:
 zpm "uninstall DHA.BI.CubeCacheWarmer"
 ```
 
-For a source installation, remove the audit hook before deleting classes:
+For a source installation, remove both audit hooks before deleting classes:
 
 ```objectscript
 set sc=##class(DHA.BI.CubeCacheWarmer.Installer).Uninstall()
@@ -213,10 +238,11 @@ do $SYSTEM.OBJ.DisplayError(sc)
 Also remove the `QueueCube()` calls from Cube Manager Post-Build and
 Post-Synchronize configuration before deleting the package classes.
 
-Uninstall removes only the cache-warmer command from `^DeepSee.AuditCode`; it
-preserves unrelated audit commands. Persistent usage and run history are not
-automatically deleted. Retain or remove those records according to the
-organization's data-retention policy before removing their model classes.
+Uninstall removes only the cache-warmer commands from `^DeepSee.AuditCode` and
+`^DeepSee.AuditQueryCode`; it preserves unrelated audit commands. Persistent
+usage and run history are not automatically deleted. Retain or remove those
+records according to the organization's data-retention policy before removing
+their model classes.
 
 ## Redistribution
 

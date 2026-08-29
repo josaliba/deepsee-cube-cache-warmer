@@ -20,14 +20,15 @@ flowchart TD
     J --> K[WarmPivot]
     J --> L[WarmMDX]
 
-    M[Dashboard open] --> N[BI audit hook]
-    N --> O[(DashboardUsage)]
-    O --> P[Popularity ordering]
-
+    M[User BI query] --> N[Query audit hook]
+    N --> O[(QueryUsage)]
+    O --> P[Frequency ordering]
     I --> P
-    P --> Q[Warm dashboard base pivots]
-    P --> R[Warm saved-default variants]
+    P --> X[Replay most-called queries]
+    P --> Q[Warm remaining dashboard base pivots]
+    P --> R[Warm remaining saved-default variants]
     I --> S[Warm remaining pivots]
+    X --> L
     Q --> L
     R --> L
     S --> L
@@ -44,10 +45,12 @@ flowchart TD
 | --- | --- |
 | `DHA.BI.CubeCacheWarmer.CacheWarmer` | Queueing, worker coalescing, discovery, MDX execution, statistics, and retention |
 | `DHA.BI.CubeCacheWarmer.DashboardUsage` | Installation and execution of the dashboard-open audit hook |
+| `DHA.BI.CubeCacheWarmer.QueryUsage` | Query-audit installation, normalized frequency counting, and native-log import |
 | `DHA.BI.CubeCacheWarmer.Installer` | Package lifecycle entry points |
 | `Model.CacheWarmRun` | One persistent row per warmer invocation |
 | `Model.CacheWarmQuery` | One child row per executed MDX query |
 | `Model.DashboardUsage` | Aggregate dashboard-open count and timestamps |
+| `Model.QueryUsage` | Normalized query key, replayable MDX, execution count, and first/last timestamps |
 
 All package globals use the `^DHABICCW` prefix and are stored in the target
 namespace's database.
@@ -104,7 +107,33 @@ a physical cube, the warmer includes saved pivots attached to subject areas
 whose base cube is that target. When the target itself is a subject area, only
 that subject area is matched.
 
-## Dashboard ranking
+## True query-frequency ranking
+
+IRIS BI calls the package through `^DeepSee.AuditQueryCode` after query
+executions. The recorder consumes each new entry in the native
+`^DeepSee.QueryLog`, prepares its MDX without executing it, obtains IRIS BI's
+normalized query key and cube, and increments `QueryUsage.ExecutionCount`.
+Per-user sequence checkpoints ensure each native log entry is counted once.
+Equivalent executions with the same query key therefore contribute to one
+frequency record.
+
+`WarmCube()` executes matching query-usage rows in this order:
+
+1. `ExecutionCount` descending.
+2. `LastExecutedAt` descending.
+3. Query key ascending as a deterministic tie breaker.
+
+The replay is marked in a process-private global. Its audit callback advances
+the native-log checkpoint without incrementing frequency, so warming never
+increases its own score. The warmed query-key set also prevents the later
+dashboard and pivot fallback phases from executing an already replayed query.
+
+The package can seed counts from `^DeepSee.QueryLog` using
+`QueryUsage.ImportQueryLog()`. Because that native global contains MDX and has
+no source marker, import is explicit rather than automatic and should normally
+be performed once.
+
+## Dashboard fallback ranking
 
 Dashboards are ordered by:
 
@@ -112,7 +141,8 @@ Dashboards are ordered by:
 2. IRIS BI dashboard `lastAccessed` descending.
 3. Dashboard name ascending as a stable tie-breaker.
 
-Usage changes only the order. Every matching saved pivot is still considered.
+Dashboard usage orders only candidates with no observed query frequency. Every
+matching saved pivot is still considered.
 
 The audit hook stores only dashboard name, open count, and first/last timestamps.
 It does not store usernames, URLs, MDX, parameters, or filter values.
@@ -165,9 +195,9 @@ opening state should be warmed explicitly with `WarmPivot()` or `WarmMDX()`.
 
 ## Remaining saved pivots
 
-After dashboard queries, the warmer enumerates all saved pivots belonging to the
-cube or its subject areas. Pivots already warmed through dashboards are skipped;
-unreferenced pivots run afterward with no dashboard priority.
+After frequency and dashboard queries, the warmer enumerates all saved pivots
+belonging to the cube or its subject areas. Pivots whose normalized query key
+was already warmed are skipped; unreferenced pivots run afterward.
 
 ## MDX execution and caching
 
@@ -203,6 +233,7 @@ Child query `SourceType` describes what was executed:
 | --- | --- |
 | `DashboardBase` | A saved pivot first discovered through a dashboard widget |
 | `DashboardDefault` | That widget's saved opening-default variant |
+| `QueryFrequency` | A real observed query replayed in descending frequency order |
 | `BasePivot` | A saved pivot not already executed through a dashboard |
 | `Pivot` | A direct `WarmPivot()` invocation |
 | `AdHocMDX` | A direct `WarmMDX()` invocation |
@@ -210,8 +241,10 @@ Child query `SourceType` describes what was executed:
 ## History and outcomes
 
 A run begins as `Running`. Each executed query writes a `CacheWarmQuery` child
-containing attribution, counts, timing, generated query key, and status. Query
-text, parameters, and filter values are not persisted.
+containing attribution, counts, timing, generated query key, frequency, actual
+execution order, and status. Run history does not store query text, but
+`Model.QueryUsage` stores resolved MDX because replay requires it. Access and
+retention for that model must account for potentially sensitive filter members.
 
 Final outcomes are:
 

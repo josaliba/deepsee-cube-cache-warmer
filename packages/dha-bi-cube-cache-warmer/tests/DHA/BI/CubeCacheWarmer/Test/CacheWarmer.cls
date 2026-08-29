@@ -74,6 +74,70 @@ Method TestInstallerPreservesExistingAuditCommand()
   }
 }
 
+Method TestQueryFrequencyAuditHook()
+{
+  Set mdx = "SELECT {[Measures].[%Count]} ON 0 FROM [DiseaseRegistryPatients]"
+  Set logUser = "DHABICCWUnitTest"
+  Kill ^DeepSee.QueryLog(logUser),^DHABICCW.QueryLogCheckpoint(logUser)
+  Kill variables
+  Set result = ##class(%DeepSee.ResultSet).%New()
+  Set sc = result.%PrepareMDX(mdx,.variables,.resolved)
+  Do $$$AssertStatusOK(sc)
+  Set queryKey = result.%GetQueryKey()
+
+  If ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%ExistsId(queryKey) {
+    Set cleanupSC = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%DeleteId(queryKey)
+    Do $$$AssertStatusOK(cleanupSC)
+  }
+
+  Set sc = ##class(DHA.BI.CubeCacheWarmer.Installer).Install()
+  Do $$$AssertStatusOK(sc)
+  Do $$$AssertTrue(^DeepSee.AuditQueryCode[$Parameter("DHA.BI.CubeCacheWarmer.QueryUsage","AUDITCOMMAND"))
+
+  Set ^DeepSee.QueryLog(logUser,1) = mdx
+  Xecute ^DeepSee.AuditQueryCode
+  Set ^DeepSee.QueryLog(logUser,2) = mdx
+  Xecute ^DeepSee.AuditQueryCode
+  Set usage = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%OpenId(queryKey,,.openSC)
+  Do $$$AssertStatusOK(openSC)
+  Do $$$AssertEquals(usage.ExecutionCount,2)
+
+  Set ^||DHABICCW.CacheWarmer("active") = 1
+  Set ^DeepSee.QueryLog(logUser,3) = mdx
+  Xecute ^DeepSee.AuditQueryCode
+  Kill ^||DHABICCW.CacheWarmer("active")
+  Set usage = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%OpenId(queryKey,,.openSC)
+  Do $$$AssertEquals(usage.ExecutionCount,2)
+
+  Set cleanupSC = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%DeleteId(queryKey)
+  Do $$$AssertStatusOK(cleanupSC)
+  Kill ^DeepSee.QueryLog(logUser),^DHABICCW.QueryLogCheckpoint(logUser)
+}
+
+Method TestInstallerPreservesExistingQueryAuditCommand()
+{
+  Set savedAuditCode = $Get(^DeepSee.AuditQueryCode)
+  Set priorCommand = "set tDHABICubeCacheWarmerPriorQueryAudit=1"
+  Set ^DeepSee.AuditQueryCode = priorCommand
+
+  Set sc = ##class(DHA.BI.CubeCacheWarmer.Installer).Install()
+  Do $$$AssertStatusOK(sc)
+  Do $$$AssertTrue(^DeepSee.AuditQueryCode[$Parameter("DHA.BI.CubeCacheWarmer.QueryUsage","AUDITCOMMAND"))
+  Do $$$AssertTrue(^DeepSee.AuditQueryCode[priorCommand)
+
+  Set laterCommand = "set tDHABICubeCacheWarmerLaterQueryAudit=1"
+  Set ^DeepSee.AuditQueryCode = laterCommand_" "_^DeepSee.AuditQueryCode
+  Set sc = ##class(DHA.BI.CubeCacheWarmer.QueryUsage).Uninstall()
+  Do $$$AssertStatusOK(sc)
+  Do $$$AssertEquals(^DeepSee.AuditQueryCode,laterCommand_" "_priorCommand)
+
+  If savedAuditCode="" {
+    Kill ^DeepSee.AuditQueryCode
+  } Else {
+    Set ^DeepSee.AuditQueryCode = savedAuditCode
+  }
+}
+
 Method TestStatsArePersistent()
 {
   Kill parameters,stats
