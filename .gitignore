@@ -8,6 +8,5 @@ data/*
 !data/.gitkeep
 dist/
 license/*
-!license/README.md
 *.log
 *.tmp
