@@ -244,7 +244,7 @@ Disease Registry bootstrap complete.
 ```
 
 If bootstrap failed, inspect the status immediately before that point. Confirm
-the license, image access, namespace creation, and compilation errors.
+image access, namespace creation, and compilation errors.
 
 ### A run is `Skipped`
 

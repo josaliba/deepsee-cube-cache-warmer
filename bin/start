@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [[ ! -f license/iris.key ]]; then
-  echo "Missing license/iris.key. Copy your valid IRIS for Health license key there before starting." >&2
-  exit 1
-fi
-
 compose_config="$(docker compose config --format json)"
 iris_port="$(python3 -c 'import json,sys; c=json.load(sys.stdin); print(c["services"]["iris"]["ports"][0]["published"])' <<<"${compose_config}")"
 web_port="$(python3 -c 'import json,sys; c=json.load(sys.stdin); print(c["services"]["webgateway"]["ports"][0]["published"])' <<<"${compose_config}")"

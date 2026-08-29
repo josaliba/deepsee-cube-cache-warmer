@@ -19,7 +19,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        IRIS_IMAGE: ${IRIS_IMAGE:-containers.intersystems.com/intersystems/irishealth:latest-em}
+        IRIS_IMAGE: ${IRIS_IMAGE:-containers.intersystems.com/intersystems/iris-community:latest-em}
     image: disease-registry-iris:dev
     container_name: disease-registry-iris
     hostname: disease-registry
@@ -29,8 +29,6 @@ services:
       iris-volume-init:
         condition: service_completed_successfully
     command:
-      - --key
-      - /license/iris.key
       - --check-caps
       - "false"
       - --after
@@ -42,7 +40,6 @@ services:
       - "${IRIS_SUPERSERVER_PORT:-1972}:1972"
     volumes:
       - iris-data:/durable
-      - ./license/iris.key:/license/iris.key:ro
       - ./src:/workspace/src:ro
       - ./tests:/workspace/tests:ro
       - ./packages:/workspace/packages:ro

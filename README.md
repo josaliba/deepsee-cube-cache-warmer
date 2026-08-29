@@ -118,8 +118,7 @@ docs/                               Demo, architecture, deployment, and operatio
 
 - Docker Desktop with Docker Compose v2
 - Git
-- Access to `containers.intersystems.com`
-- A valid IRIS for Health license key
+- Network access to `containers.intersystems.com`
 
 Clone the repository and enter it:
 
@@ -128,8 +127,10 @@ git clone git@gitlab.iscinternal.com:jsaliba/deepsee-cube-cache-warmer.git
 cd deepsee-cube-cache-warmer
 ```
 
-Authenticate to the InterSystems Container Registry if needed, copy the license
-to `license/iris.key`, and start the stack:
+The default [`iris-community:latest-em`](https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=ACLOUD)
+image is public and includes a Community Edition license, so no external IRIS
+key is required. Authenticate to the InterSystems Container Registry only if
+access to the separate Web Gateway image requires it, then start the stack:
 
 ```bash
 docker login containers.intersystems.com
@@ -222,8 +223,8 @@ Copy `.env.example` to `.env` to override image tags or host ports. Pin the IRIS
 and Web Gateway images to matching explicit versions before using the demo as a
 long-lived environment.
 
-The license file, `.env`, generated archives, runtime data, and local editor
-settings are excluded from Git. Do not commit credentials or license material.
+The `.env` file, generated archives, runtime data, and local editor settings are
+excluded from Git. Do not commit credentials or other sensitive material.
 
 Before production deployment, review authentication, TLS, authorization,
 licensing, auditing, backups, data retention, resource limits, and applicable

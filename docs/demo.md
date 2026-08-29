@@ -1,8 +1,8 @@
 # Install and run the demo
 
-This guide creates a disposable local IRIS for Health environment, installs the
-standalone cache-warmer package, loads the Disease Registry demo, builds its two
-cubes, and verifies cache warming.
+This guide creates a disposable local IRIS Community Edition environment,
+installs the standalone cache-warmer package, loads the Disease Registry demo,
+builds its two cubes, and verifies cache warming.
 
 The environment is for local development only. It uses known credentials,
 unencrypted HTTP, and named Docker volumes.
@@ -30,8 +30,7 @@ cubes without rebuilding every fact.
 - Docker Desktop with Docker Compose v2
 - Git
 - Network access to the InterSystems Container Registry
-- Permission to pull the configured IRIS for Health and Web Gateway images
-- A valid IRIS for Health license key
+- Permission to pull the configured IRIS Community and Web Gateway images
 - Optional: Visual Studio Code with the extensions recommended by the repository
 
 ## Clone and configure
@@ -41,25 +40,20 @@ git clone git@gitlab.iscinternal.com:jsaliba/deepsee-cube-cache-warmer.git
 cd deepsee-cube-cache-warmer
 ```
 
-Authenticate to the InterSystems Container Registry when required:
+The public [`iris-community:latest-em`](https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=ACLOUD)
+image includes its Community Edition license; no external `iris.key` file is
+required. Authenticate to the InterSystems Container Registry only if pulling
+the separate Web Gateway image requires it:
 
 ```bash
 docker login containers.intersystems.com
 ```
 
-Copy the licensed key into the ignored location:
-
-```text
-license/iris.key
-```
-
-Do not commit or redistribute that file.
-
 The default configuration is:
 
 | Setting | Default |
 | --- | --- |
-| IRIS image | `containers.intersystems.com/intersystems/irishealth:latest-em` |
+| IRIS image | `containers.intersystems.com/intersystems/iris-community:latest-em` |
 | Web Gateway image | `containers.intersystems.com/intersystems/webgateway:latest-em` |
 | IRIS SuperServer host port | `1972` |
 | Web Gateway host port | `52773` |
