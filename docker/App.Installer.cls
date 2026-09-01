@@ -14,8 +14,6 @@ XData Setup
     <Configuration>
       <Database Name="${Namespace}" Dir="${DatabaseDir}" Create="yes" Resource="%DB_${Namespace}"/>
     </Configuration>
-    <Import File="${CacheWarmerSourceDir}" Flags="ck" Recurse="1"/>
-    <Import File="${SourceDir}" Flags="ck" Recurse="1"/>
   </Namespace>
 </Manifest>
 }
@@ -47,9 +45,11 @@ ClassMethod Bootstrap() As %Status
     Set $Namespace = previousNamespace
     Quit sc
   }
-  Set sc = $SYSTEM.OBJ.LoadDir("/workspace/packages/dha-bi-cube-cache-warmer/src", "ck", , 1)
+  // Restrict recursive imports to ObjectScript classes. This prevents host
+  // metadata such as macOS .DS_Store files from making bootstrap fail.
+  Set sc = $SYSTEM.OBJ.Import("/workspace/packages/dha-bi-cube-cache-warmer/src", "ck/recurse=1/extensions=cls")
   If '$SYSTEM.Status.IsError(sc) {
-    Set sc = $SYSTEM.OBJ.LoadDir("/workspace/src", "ck", , 1)
+    Set sc = $SYSTEM.OBJ.Import("/workspace/src", "ck/recurse=1/extensions=cls")
   }
   If '$SYSTEM.Status.IsError(sc) {
     Set sc = ##class(%DeepSee.CubeManager.Utils).SetActiveRegistry("DiseaseRegistry.CubeRegistry", 1)

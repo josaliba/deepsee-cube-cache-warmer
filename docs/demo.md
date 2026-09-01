@@ -224,8 +224,13 @@ registry contains enabled groups for both cubes and schedules updates every five
 minutes.
 
 If you change Cube Manager configuration, export the generated
-`DiseaseRegistry.CubeRegistry` class back into `src/` so the change survives a
-fresh installation.
+`DiseaseRegistry.CubeRegistry` class so the change survives a fresh
+installation. The checked-in class deliberately uses the legacy
+`%DeepSee.CubeManager.RegistryDefinitionSuper` format required by IRIS 2025.1.
+Newer IRIS releases may upgrade the compiled class to `%DeepSee.CubeSchedule`;
+do not replace the checked-in source with that upgraded format while IRIS 2025.1
+support is required. Port the schedule changes into the legacy source and rerun
+the compatibility tests instead.
 
 ## Stop, restart, or reset
 

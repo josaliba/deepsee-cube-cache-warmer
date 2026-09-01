@@ -21,6 +21,8 @@ It provides:
 - an Analytics-enabled namespace; and
 - a user that can compile the package and update its persistent tables.
 
+The package test suite has been verified on InterSystems IRIS 2025.1.5.
+
 ## Package contents
 
 ```text

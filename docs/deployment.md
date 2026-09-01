@@ -14,6 +14,10 @@ or the demo's Cube Manager registry.
   `^DeepSee.AuditQueryCode`.
 - A runtime identity allowed to query the cubes and execute the saved MDX.
 
+The package test suite has been verified on InterSystems IRIS 2025.1.5. The
+Disease Registry demo also verifies the IRIS 2025.1 Cube Manager hook and
+registry integration used by the background warmer.
+
 Install the package separately into every namespace where it will be used. Its
 classes, persistent history, dashboard/query usage, both audit hooks, and locks are
 namespace-scoped.
@@ -101,7 +105,10 @@ saved pivots, not the generated fact-table class name.
 
 If Cube Manager configuration is maintained through a generated registry class,
 export and deploy that class with the application so the hooks survive database
-recreation.
+recreation. For applications that must support both IRIS 2025.1 and newer
+releases, retain the legacy `%DeepSee.CubeManager.RegistryDefinitionSuper`
+format; newer releases can upgrade it when loading, while IRIS 2025.1 cannot
+load the newer `%DeepSee.CubeSchedule` format.
 
 ## Verify a deployment
 

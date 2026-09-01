@@ -109,6 +109,17 @@ behavior of each path, including concurrency, dashboard ranking, and outcomes.
 - Direct APIs for warming a cube, pivot, or arbitrary MDX.
 - IPM and source-based deployment options.
 
+## Compatibility
+
+The standalone package and the complete demo are verified on InterSystems IRIS
+2025.1.5. Validation covers a clean Docker bootstrap, restart bootstrap, both
+test suites, cube builds, saved dashboard and pivot creation, and cache warming.
+
+The checked-in Cube Manager registry deliberately uses the legacy registry
+model supported by IRIS 2025.1. Newer IRIS releases automatically upgrade that
+model in the compiled namespace; the same source has also been verified through
+that upgrade path on IRIS 2026.1.
+
 ## Repository layout
 
 ```text

@@ -30,23 +30,34 @@ Method TestCubeManagerRegistry()
 
   Set map = ##class(%DeepSee.CubeManager.Utils).BuildRegistryMap(.sc,registry,1,.lookup)
   Do $$$AssertStatusOK(sc)
-  Do $$$AssertEquals(map.Groups.Count(),2)
+  Do $$$AssertTrue(map.Groups.Count()>0)
 
+  Set cubeCount = 0
   For groupIndex=1:1:map.Groups.Count() {
     Set group = map.Groups.GetAt(groupIndex)
     Do $$$AssertTrue(group.IsRegistered)
     Do $$$AssertEquals(group.Disabled,0)
-    Do $$$AssertEquals(group.UpdatePlan,"Every")
-    Do $$$AssertEquals(group.BuildFrequency,5)
-    Do $$$AssertEquals(group.BuildTimeUnit,"Minute")
+    If group.%IsA("%DeepSee.CubeManager.RegistryMapGroup") {
+      Do $$$AssertEquals(group.UpdatePlan,"BuildSynch")
+      Do $$$AssertEquals(group.SynchFrequency,5)
+      Do $$$AssertEquals(group.SynchTimeUnit,"Minute")
+    } Else {
+      Do $$$AssertEquals(group.UpdatePlan,"Every")
+      Do $$$AssertEquals(group.BuildFrequency,5)
+      Do $$$AssertEquals(group.BuildTimeUnit,"Minute")
+    }
 
-    Set cube = group.Cubes.GetAt(1)
-    Do $$$AssertTrue(cube.DSTimeEnabled)
-    Do $$$AssertEquals(cube.Disabled,0)
-    Do $$$AssertNotEquals(cube.PostBuildCode,"")
-    Do $$$AssertTrue(cube.PostBuildCode["dha.bi.CubeCacheWarmer.CacheWarmer")
-    Do $$$AssertEquals(cube.PostSynchCode,cube.PostBuildCode)
+    For cubeIndex=1:1:group.Cubes.Count() {
+      Set cube = group.Cubes.GetAt(cubeIndex)
+      Set cubeCount = cubeCount+1
+      Do $$$AssertTrue(cube.DSTimeEnabled)
+      Do $$$AssertEquals(cube.Disabled,0)
+      Do $$$AssertNotEquals(cube.PostBuildCode,"")
+      Do $$$AssertTrue(cube.PostBuildCode["dha.bi.CubeCacheWarmer.CacheWarmer")
+      Do $$$AssertEquals(cube.PostSynchCode,cube.PostBuildCode)
+    }
   }
+  Do $$$AssertEquals(cubeCount,2)
 }
 
 }
