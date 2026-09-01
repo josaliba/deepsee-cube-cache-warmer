@@ -1,5 +1,5 @@
 /// Persistent execution frequency for a normalized IRIS BI query.
-Class DHA.BI.CubeCacheWarmer.Model.QueryUsage Extends (%Persistent, %JSON.Adaptor)
+Class dha.bi.CubeCacheWarmer.Model.QueryUsage Extends (%Persistent, %JSON.Adaptor)
 {
 
 /// IRIS BI's normalized query key. This is also the record ID.

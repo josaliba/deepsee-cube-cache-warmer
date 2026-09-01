@@ -9,5 +9,5 @@ archive_dir="${project_root}/dist"
 archive_path="${archive_dir}/${package_name}-${package_version}.tar.gz"
 
 mkdir -p "${archive_dir}"
-tar -czf "${archive_path}" -C "${project_root}/packages" "${package_name}"
+tar --exclude='.DS_Store' -czf "${archive_path}" -C "${project_root}/packages" "${package_name}"
 printf '%s\n' "${archive_path}"

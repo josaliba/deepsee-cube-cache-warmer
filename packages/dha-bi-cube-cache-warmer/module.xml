@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-  <Document name="DHA.BI.CubeCacheWarmer.ZPM">
+  <Document name="dha.bi.CubeCacheWarmer.ZPM">
     <Module>
-      <Name>DHA.BI.CubeCacheWarmer</Name>
+      <Name>dha.bi.CubeCacheWarmer</Name>
       <Description>True query-frequency-ordered cache warming for InterSystems IRIS Business Intelligence cubes and dashboards.</Description>
-      <Version>1.1.0</Version>
+      <Version>1.2.0</Version>
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
-      <Resource Name="DHA.BI.CubeCacheWarmer.PKG"/>
+      <Resource Name="dha.bi.CubeCacheWarmer.PKG"/>
       <SystemRequirements Version=">=2021.1"/>
-      <Invoke Class="DHA.BI.CubeCacheWarmer.Installer" Method="Install" Phase="Activate" When="After"/>
-      <Invoke Class="DHA.BI.CubeCacheWarmer.Installer" Method="Uninstall" Phase="Clean" When="Before"/>
+      <Invoke Class="dha.bi.CubeCacheWarmer.Installer" Method="Install" Phase="Activate" When="After"/>
+      <Invoke Class="dha.bi.CubeCacheWarmer.Installer" Method="Uninstall" Phase="Clean" When="Before"/>
     </Module>
   </Document>
 </Export>

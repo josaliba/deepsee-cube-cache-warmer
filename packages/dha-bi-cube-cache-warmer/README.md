@@ -1,4 +1,4 @@
-# DHA.BI.CubeCacheWarmer
+# dha.bi.CubeCacheWarmer
 
 Self-contained cache-warming package for InterSystems IRIS Business
 Intelligence. The package has no dependency on application-specific classes,
@@ -24,7 +24,7 @@ It provides:
 ## Package contents
 
 ```text
-src/DHA/BI/CubeCacheWarmer/
+src/dha/bi/CubeCacheWarmer/
 ├── CacheWarmer.cls
 ├── DashboardUsage.cls
 ├── Installer.cls
@@ -38,6 +38,15 @@ src/DHA/BI/CubeCacheWarmer/
 
 The entire `dha-bi-cube-cache-warmer` directory can be copied into another
 repository or archived for distribution.
+
+### Upgrading from the uppercase package name
+
+IRIS class names are case-insensitive but retain their canonical case. An
+existing `DHA.BI.CubeCacheWarmer` installation must therefore have its old
+class and extent definitions removed before `dha.bi.CubeCacheWarmer` is loaded.
+The stored `^DHABICCW` data is preserved. Follow the package-case migration in
+[the deployment guide](../../docs/deployment.md#upgrade-from-dhabi-to-dhabi)
+before using either installation method below.
 
 ## Install with InterSystems Package Manager
 
@@ -56,7 +65,7 @@ preserved and run after the cache-warmer recorders.
 ```objectscript
 set sc=$SYSTEM.OBJ.LoadDir("/path/to/dha-bi-cube-cache-warmer/src","ck",,1)
 do $SYSTEM.OBJ.DisplayError(sc)
-set sc=##class(DHA.BI.CubeCacheWarmer.Installer).Install()
+set sc=##class(dha.bi.CubeCacheWarmer.Installer).Install()
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
@@ -66,7 +75,7 @@ Use the following as both the cube's Post-Build Code and Post-Synchronize Code,
 substituting its logical cube name:
 
 ```objectscript
-do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
+do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
 ```
 
 The call starts a background process. It does not wait for all MDX queries to
@@ -77,7 +86,7 @@ finish in the Cube Manager task.
 Warm a cube synchronously:
 
 ```objectscript
-set sc=##class(DHA.BI.CubeCacheWarmer.CacheWarmer).WarmCube("MyCube",0,1,.stats)
+set sc=##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmCube("MyCube",0,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 zwrite stats
 ```
@@ -85,7 +94,7 @@ zwrite stats
 Warm one saved pivot:
 
 ```objectscript
-set sc=##class(DHA.BI.CubeCacheWarmer.CacheWarmer).WarmPivot("Folder/My Pivot.pivot",.parameters,1,.stats)
+set sc=##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmPivot("Folder/My Pivot.pivot",.parameters,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
@@ -94,7 +103,7 @@ do $SYSTEM.OBJ.DisplayError(sc)
 ```sql
 SELECT TOP 20 %ID, CubeName, Mode, Outcome, StartedAt, FinishedAt,
        TotalQueries, SucceededQueries, FailedQueries, ElapsedSeconds, StatusText
-FROM DHA_BI_CubeCacheWarmer_Model.CacheWarmRun
+FROM dha_bi_CubeCacheWarmer_Model.CacheWarmRun
 ORDER BY %ID DESC
 ```
 
@@ -102,13 +111,13 @@ ORDER BY %ID DESC
 SELECT QueryName, SourceType, DashboardName, WidgetName, DefaultFilterCount,
        DashboardOpenCount, QueryFrequency, PriorityOrder, CubeName, QueryKey,
        RowCount, ColumnCount, ElapsedSeconds, Success, StatusText
-FROM DHA_BI_CubeCacheWarmer_Model.CacheWarmQuery
+FROM dha_bi_CubeCacheWarmer_Model.CacheWarmQuery
 WHERE Run = :runId
 ```
 
 ```sql
 SELECT DashboardName, OpenCount, FirstOpenedAt, LastOpenedAt
-FROM DHA_BI_CubeCacheWarmer_Model.DashboardUsage
+FROM dha_bi_CubeCacheWarmer_Model.DashboardUsage
 ORDER BY OpenCount DESC, LastOpenedAt DESC
 ```
 
@@ -116,14 +125,14 @@ Inspect the true query-frequency order used by the next warm run:
 
 ```sql
 SELECT CubeName, QueryKey, ExecutionCount, FirstExecutedAt, LastExecutedAt
-FROM DHA_BI_CubeCacheWarmer_Model.QueryUsage
+FROM dha_bi_CubeCacheWarmer_Model.QueryUsage
 ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey
 ```
 
 To seed the frequency table once from existing native query-log history:
 
 ```objectscript
-set sc=##class(DHA.BI.CubeCacheWarmer.QueryUsage).ImportQueryLog(1,.imported)
+set sc=##class(dha.bi.CubeCacheWarmer.QueryUsage).ImportQueryLog(1,.imported)
 do $SYSTEM.OBJ.DisplayError(sc)
 write imported," historical executions imported",!
 ```
@@ -135,7 +144,7 @@ entry currently present in `^DeepSee.QueryLog`.
 Delete completed warmer history older than 30 days:
 
 ```objectscript
-set sc=##class(DHA.BI.CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
+set sc=##class(dha.bi.CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
 ```
 
 ## Uninstall
@@ -144,13 +153,13 @@ An IPM uninstall automatically removes both cache-warmer audit hooks before
 removing the package:
 
 ```objectscript
-zpm "uninstall DHA.BI.CubeCacheWarmer"
+zpm "uninstall dha.bi.CubeCacheWarmer"
 ```
 
 For a source-based installation, remove both hooks before deleting the classes:
 
 ```objectscript
-set sc=##class(DHA.BI.CubeCacheWarmer.Installer).Uninstall()
+set sc=##class(dha.bi.CubeCacheWarmer.Installer).Uninstall()
 ```
 
 This removes only the cache-warmer commands. It does not delete persistent usage

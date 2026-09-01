@@ -88,7 +88,7 @@ Bootstrap performs the following work:
 1. Creates durable IRIS system storage.
 2. Creates the `DISEASEREGISTRY` database and namespace.
 3. Enables the namespace for interoperability and Analytics.
-4. Imports and compiles `DHA.BI.CubeCacheWarmer`.
+4. Imports and compiles `dha.bi.CubeCacheWarmer`.
 5. Imports and compiles the demo application.
 6. Activates `DiseaseRegistry.CubeRegistry` and updater tasks.
 7. Installs the dashboard-open and normalized-query-frequency audit hooks.
@@ -174,7 +174,7 @@ Inspect recent warmer runs in the Management Portal SQL page while using the
 SELECT TOP 20 %ID AS RunId, CubeName, Mode, Outcome,
        TotalQueries, SucceededQueries, FailedQueries,
        EnumerationErrors, ElapsedSeconds, StatusText
-FROM DHA_BI_CubeCacheWarmer_Model.CacheWarmRun
+FROM dha_bi_CubeCacheWarmer_Model.CacheWarmRun
 ORDER BY %ID DESC
 ```
 
@@ -186,7 +186,7 @@ After exercising dashboards and pivots, inspect the real frequency source:
 
 ```sql
 SELECT CubeName, QueryKey, ExecutionCount, LastExecutedAt
-FROM DHA_BI_CubeCacheWarmer_Model.QueryUsage
+FROM dha_bi_CubeCacheWarmer_Model.QueryUsage
 ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey
 ```
 

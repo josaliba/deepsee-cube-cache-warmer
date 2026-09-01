@@ -1,6 +1,6 @@
 # Architecture and execution flow
 
-`DHA.BI.CubeCacheWarmer` executes real IRIS BI MDX queries so IRIS repopulates
+`dha.bi.CubeCacheWarmer` executes real IRIS BI MDX queries so IRIS repopulates
 its standard result cache. It does not implement or store a separate cache.
 
 ## High-level flow
@@ -43,10 +43,10 @@ flowchart TD
 
 | Class | Responsibility |
 | --- | --- |
-| `DHA.BI.CubeCacheWarmer.CacheWarmer` | Queueing, worker coalescing, discovery, MDX execution, statistics, and retention |
-| `DHA.BI.CubeCacheWarmer.DashboardUsage` | Installation and execution of the dashboard-open audit hook |
-| `DHA.BI.CubeCacheWarmer.QueryUsage` | Query-audit installation, normalized frequency counting, and native-log import |
-| `DHA.BI.CubeCacheWarmer.Installer` | Package lifecycle entry points |
+| `dha.bi.CubeCacheWarmer.CacheWarmer` | Queueing, worker coalescing, discovery, MDX execution, statistics, and retention |
+| `dha.bi.CubeCacheWarmer.DashboardUsage` | Installation and execution of the dashboard-open audit hook |
+| `dha.bi.CubeCacheWarmer.QueryUsage` | Query-audit installation, normalized frequency counting, and native-log import |
+| `dha.bi.CubeCacheWarmer.Installer` | Package lifecycle entry points |
 | `Model.CacheWarmRun` | One persistent row per warmer invocation |
 | `Model.CacheWarmQuery` | One child row per executed MDX query |
 | `Model.DashboardUsage` | Aggregate dashboard-open count and timestamps |
@@ -62,7 +62,7 @@ namespace's database.
 Configure both Cube Manager Post-Build and Post-Synchronize code with:
 
 ```objectscript
-do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
+do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
 ```
 
 `QueueCube()` validates its inputs and starts `WarmWhenAvailable()` in a separate

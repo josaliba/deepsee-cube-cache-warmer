@@ -2,14 +2,16 @@ Include %occStatus
 
 /// Counts real IRIS BI query executions through ^DeepSee.AuditQueryCode.
 /// Cache-warmer executions are marked process-locally and are never counted.
-Class DHA.BI.CubeCacheWarmer.QueryUsage Extends %RegisteredObject
+Class dha.bi.CubeCacheWarmer.QueryUsage Extends %RegisteredObject
 {
 
-Parameter AUDITCOMMAND = "do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).RecordAudit()";
+Parameter AUDITCOMMAND = "do ##class(dha.bi.CubeCacheWarmer.QueryUsage).RecordAudit()";
 
-Parameter LEGACYAUDITCOMMAND = "do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).Record(%dsQuery)";
+Parameter LEGACYAUDITCOMMAND = "do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).RecordAudit()";
 
-Parameter LEGACYAUDITCOMMAND2 = "do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).RecordQuery(pQuery,$get(%dsQuery))";
+Parameter LEGACYAUDITCOMMAND2 = "do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).Record(%dsQuery)";
+
+Parameter LEGACYAUDITCOMMAND3 = "do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).RecordQuery(pQuery,$get(%dsQuery))";
 
 ClassMethod Install(Output pChanged As %Boolean = 0) As %Status
 {
@@ -18,7 +20,9 @@ ClassMethod Install(Output pChanged As %Boolean = 0) As %Status
   If $$$ISERR(tRemoveSC) Quit tRemoveSC
   Set tRemoveSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND2,.tLegacy2Changed)
   If $$$ISERR(tRemoveSC) Quit tRemoveSC
-  Set pChanged = tLegacyChanged||tLegacy2Changed
+  Set tRemoveSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND3,.tLegacy3Changed)
+  If $$$ISERR(tRemoveSC) Quit tRemoveSC
+  Set pChanged = tLegacyChanged||tLegacy2Changed||tLegacy3Changed
   Set tCommand = ..#AUDITCOMMAND
   Set tCurrent = $Get(^DeepSee.AuditQueryCode)
   If tCurrent[tCommand {
@@ -38,7 +42,9 @@ ClassMethod Uninstall(Output pChanged As %Boolean = 0) As %Status
   Set tSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND,.tLegacyChanged)
   If $$$ISERR(tSC) Quit tSC
   Set tSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND2,.tLegacy2Changed)
-  Set pChanged = tCurrentChanged||tLegacyChanged||tLegacy2Changed
+  If $$$ISERR(tSC) Quit tSC
+  Set tSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND3,.tLegacy3Changed)
+  Set pChanged = tCurrentChanged||tLegacyChanged||tLegacy2Changed||tLegacy3Changed
   Quit tSC
 }
 
@@ -79,7 +85,7 @@ ClassMethod ImportQueryLog(pReset As %Boolean = 0, Output pImported As %Integer 
 {
   Set pImported = 0
   If pReset {
-    Set tSC = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%DeleteExtent()
+    Set tSC = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%DeleteExtent()
     If $$$ISERR(tSC) Quit tSC
   }
 
@@ -133,11 +139,11 @@ ClassMethod RecordKnownQuery(pQueryKey As %String, pCubeName As %String, pMDX As
     Lock +^DHABICCW.QueryUsageLock(pQueryKey)
     Set tLockHeld = 1
     Set tNow = ..CurrentTimestamp()
-    If ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%ExistsId(pQueryKey) {
-      Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%OpenId(pQueryKey,,.tOpenSC)
+    If ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%ExistsId(pQueryKey) {
+      Set tUsage = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%OpenId(pQueryKey,,.tOpenSC)
     } Else {
       Set tOpenSC = $$$OK
-      Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%New()
+      Set tUsage = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%New()
       Set tUsage.QueryKey = pQueryKey
       Set tUsage.ExecutionCount = 0
       Set tUsage.FirstExecutedAt = tNow

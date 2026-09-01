@@ -1,6 +1,6 @@
 /// Aggregate dashboard-open statistics used to prioritize cache warming.
 /// No user identifiers, URL parameters, filter values, or query text are stored.
-Class DHA.BI.CubeCacheWarmer.Model.DashboardUsage Extends (%Persistent, %JSON.Adaptor)
+Class dha.bi.CubeCacheWarmer.Model.DashboardUsage Extends (%Persistent, %JSON.Adaptor)
 {
 
 Property DashboardName As %String(MAXLEN = 512) [ Required ];

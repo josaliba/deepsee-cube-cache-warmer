@@ -1,7 +1,7 @@
 # DeepSee Cube Cache Warmer
 
 True query-frequency-aware cache warming for InterSystems IRIS Business Intelligence
-(formerly DeepSee). The reusable `DHA.BI.CubeCacheWarmer` package executes saved
+(formerly DeepSee). The reusable `dha.bi.CubeCacheWarmer` package executes saved
 dashboard and pivot queries after cube builds or synchronizations so IRIS can
 repopulate its normal result cache before users open the dashboards.
 
@@ -59,7 +59,7 @@ flowchart TD
    warmer:
 
    ```objectscript
-   do ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
+   do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
    ```
 
    Requests for the same cube are coalesced so concurrent hooks do not start
@@ -84,10 +84,10 @@ flowchart TD
    success or failure, row and column counts, real query frequency, actual
    execution order, dashboard attribution, and query type:
 
-   - `DHA_BI_CubeCacheWarmer_Model.CacheWarmRun`
-   - `DHA_BI_CubeCacheWarmer_Model.CacheWarmQuery`
-   - `DHA_BI_CubeCacheWarmer_Model.DashboardUsage`
-   - `DHA_BI_CubeCacheWarmer_Model.QueryUsage`
+   - `dha_bi_CubeCacheWarmer_Model.CacheWarmRun`
+   - `dha_bi_CubeCacheWarmer_Model.CacheWarmQuery`
+   - `dha_bi_CubeCacheWarmer_Model.DashboardUsage`
+   - `dha_bi_CubeCacheWarmer_Model.QueryUsage`
 
 See [Architecture and execution flow](docs/architecture.md) for the detailed
 behavior of each path, including concurrency, dashboard ranking, and outcomes.
@@ -203,7 +203,7 @@ Create a versioned archive from the version in `module.xml`:
 The script writes an ignored archive such as:
 
 ```text
-dist/dha-bi-cube-cache-warmer-1.1.0.tar.gz
+dist/dha-bi-cube-cache-warmer-1.2.0.tar.gz
 ```
 
 See [deployment.md](docs/deployment.md) for IPM installation, source-based

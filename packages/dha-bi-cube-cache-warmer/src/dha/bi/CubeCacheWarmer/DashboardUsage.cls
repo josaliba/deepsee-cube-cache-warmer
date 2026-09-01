@@ -3,16 +3,21 @@ Include %occStatus
 /// Records dashboard opens through IRIS BI's documented ^DeepSee.AuditCode hook.
 /// The hook performs one short, contention-safe update and never interrupts a
 /// dashboard request if usage tracking encounters an error.
-Class DHA.BI.CubeCacheWarmer.DashboardUsage Extends %RegisteredObject
+Class dha.bi.CubeCacheWarmer.DashboardUsage Extends %RegisteredObject
 {
 
-Parameter AUDITCOMMAND = "do ##class(DHA.BI.CubeCacheWarmer.DashboardUsage).Record(%dsDashboard)";
+Parameter AUDITCOMMAND = "do ##class(dha.bi.CubeCacheWarmer.DashboardUsage).Record(%dsDashboard)";
+
+Parameter LEGACYAUDITCOMMAND = "do ##class(DHA.BI.CubeCacheWarmer.DashboardUsage).Record(%dsDashboard)";
 
 /// Install the dashboard-access hook in the current namespace. If another BI
 /// dashboard audit command already exists, it is retained and runs afterwards.
 ClassMethod Install(Output pChanged As %Boolean = 0) As %Status
 {
   Set pChanged = 0
+  Set tSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND,.tLegacyChanged)
+  If $$$ISERR(tSC) Quit tSC
+  Set pChanged = tLegacyChanged
   Set tCommand = ..#AUDITCOMMAND
   Set tCurrent = $Get(^DeepSee.AuditCode)
   If tCurrent[tCommand Quit $$$OK
@@ -26,7 +31,11 @@ ClassMethod Install(Output pChanged As %Boolean = 0) As %Status
 /// was configured before installation in place.
 ClassMethod Uninstall(Output pChanged As %Boolean = 0) As %Status
 {
-  Quit ..RemoveCommand(..#AUDITCOMMAND,.pChanged)
+  Set tSC = ..RemoveCommand(..#AUDITCOMMAND,.tCurrentChanged)
+  If $$$ISERR(tSC) Quit tSC
+  Set tSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND,.tLegacyChanged)
+  Set pChanged = tCurrentChanged||tLegacyChanged
+  Quit tSC
 }
 
 ClassMethod RemoveCommand(pCommand As %String, Output pChanged As %Boolean = 0) As %Status [ Private ]
@@ -65,11 +74,11 @@ ClassMethod Record(pDashboard As %String)
 
   Try {
     Set tNow = ..CurrentTimestamp()
-    If ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%ExistsId(tDashboard) {
-      Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%OpenId(tDashboard,,.tSC)
+    If ##class(dha.bi.CubeCacheWarmer.Model.DashboardUsage).%ExistsId(tDashboard) {
+      Set tUsage = ##class(dha.bi.CubeCacheWarmer.Model.DashboardUsage).%OpenId(tDashboard,,.tSC)
       If $$$ISERR(tSC) Quit
     } Else {
-      Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%New()
+      Set tUsage = ##class(dha.bi.CubeCacheWarmer.Model.DashboardUsage).%New()
       Set tUsage.DashboardName = tDashboard
       Set tUsage.OpenCount = 0
       Set tUsage.FirstOpenedAt = tNow
@@ -87,7 +96,7 @@ ClassMethod Record(pDashboard As %String)
 
 ClassMethod GetOpenCount(pDashboard As %String) As %Integer
 {
-  Set tUsage = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%OpenId(pDashboard,,.tSC)
+  Set tUsage = ##class(dha.bi.CubeCacheWarmer.Model.DashboardUsage).%OpenId(pDashboard,,.tSC)
   If $$$ISERR(tSC) Quit 0
   If '$IsObject(tUsage) Quit 0
   Quit tUsage.OpenCount

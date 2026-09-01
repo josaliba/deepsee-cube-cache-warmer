@@ -1,3 +1,5 @@
+Include %occStatus
+
 Class App.Installer
 {
 
@@ -40,6 +42,11 @@ ClassMethod Bootstrap() As %Status
 
   Set previousNamespace = $Namespace
   Set $Namespace = "DISEASEREGISTRY"
+  Set sc = ..MigrateCacheWarmerPackageCase()
+  If $SYSTEM.Status.IsError(sc) {
+    Set $Namespace = previousNamespace
+    Quit sc
+  }
   Set sc = $SYSTEM.OBJ.LoadDir("/workspace/packages/dha-bi-cube-cache-warmer/src", "ck", , 1)
   If '$SYSTEM.Status.IsError(sc) {
     Set sc = $SYSTEM.OBJ.LoadDir("/workspace/src", "ck", , 1)
@@ -51,10 +58,32 @@ ClassMethod Bootstrap() As %Status
     Set sc = ##class(%DeepSee.CubeManager.Utils).ScheduleUpdaterTasks()
   }
   If '$SYSTEM.Status.IsError(sc) {
-    Set sc = ##class(DHA.BI.CubeCacheWarmer.Installer).Install()
+    Set sc = ##class(dha.bi.CubeCacheWarmer.Installer).Install()
   }
   Set $Namespace = previousNamespace
 
+  Quit sc
+}
+
+/// IRIS class names are case-insensitive but retain canonical case. Remove only
+/// the old uppercase definitions and extent registrations before importing the
+/// lowercase package. Persistent ^DHABICCW data is deliberately preserved.
+ClassMethod MigrateCacheWarmerPackageCase() As %Status
+{
+  Set definition = ##class(%Dictionary.ClassDefinition).%OpenId("DHA.BI.CubeCacheWarmer.CacheWarmer",,.openSC)
+  If $SYSTEM.Status.IsError(openSC) Quit $$$OK
+  If '$IsObject(definition) Quit $$$OK
+  If definition.Name'="DHA.BI.CubeCacheWarmer.CacheWarmer" Quit $$$OK
+
+  Set sc = ##class(DHA.BI.CubeCacheWarmer.Installer).Uninstall()
+  If $SYSTEM.Status.IsError(sc) Quit sc
+  Set sc = $SYSTEM.OBJ.DeletePackage("DHA.BI.CubeCacheWarmer")
+  If $SYSTEM.Status.IsError(sc) Quit sc
+
+  For className = "DHA.BI.CubeCacheWarmer.Model.CacheWarmQuery","DHA.BI.CubeCacheWarmer.Model.CacheWarmRun","DHA.BI.CubeCacheWarmer.Model.DashboardUsage","DHA.BI.CubeCacheWarmer.Model.QueryUsage" {
+    Set sc = ##class(%ExtentMgr.Util).DeleteExtentDefinitionIfExists(className)
+    If $SYSTEM.Status.IsError(sc) Quit
+  }
   Quit sc
 }
 

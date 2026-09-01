@@ -1,9 +1,9 @@
-Class DHA.BI.CubeCacheWarmer.Test.CacheWarmer Extends %UnitTest.TestCase
+Class dha.bi.CubeCacheWarmer.Test.CacheWarmer Extends %UnitTest.TestCase
 {
 
 Method TestRejectsMissingCubeName()
 {
-  Set sc = ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).QueueCube("")
+  Set sc = ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("")
   Do $$$AssertStatusNotOK(sc)
 }
 
@@ -14,7 +14,7 @@ Method TestDashboardDefaultFilterComposition()
   Set filters("[Region].[H1].[Region]") = "{&[One],&[Two]}"
   Set baseMDX = "SELECT {[Measures].[%Count]} ON 0 FROM [ExampleCube]"
 
-  Set sc = ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).ApplyDefaultFilters(baseMDX,.filters,.filteredMDX,.filterCount)
+  Set sc = ##class(dha.bi.CubeCacheWarmer.CacheWarmer).ApplyDefaultFilters(baseMDX,.filters,.filteredMDX,.filterCount)
   Do $$$AssertStatusOK(sc)
   Do $$$AssertEquals(filterCount,2)
   Do $$$AssertTrue(filteredMDX[" %FILTER NONEMPTYCROSSJOIN(")
@@ -25,28 +25,28 @@ Method TestDashboardDefaultFilterComposition()
 Method TestDashboardUsageAuditHook()
 {
   Set dashboardName = "DHA BI Cube Cache Warmer/Test Usage.dashboard"
-  If ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%ExistsId(dashboardName) {
-    Set cleanupSC = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%DeleteId(dashboardName)
+  If ##class(dha.bi.CubeCacheWarmer.Model.DashboardUsage).%ExistsId(dashboardName) {
+    Set cleanupSC = ##class(dha.bi.CubeCacheWarmer.Model.DashboardUsage).%DeleteId(dashboardName)
     Do $$$AssertStatusOK(cleanupSC)
   }
 
-  Set sc = ##class(DHA.BI.CubeCacheWarmer.Installer).Install()
+  Set sc = ##class(dha.bi.CubeCacheWarmer.Installer).Install()
   Do $$$AssertStatusOK(sc)
-  Do $$$AssertTrue(^DeepSee.AuditCode[$Parameter("DHA.BI.CubeCacheWarmer.DashboardUsage","AUDITCOMMAND"))
+  Do $$$AssertTrue(^DeepSee.AuditCode[$Parameter("dha.bi.CubeCacheWarmer.DashboardUsage","AUDITCOMMAND"))
 
   Set sc = ##class(%DeepSee.Utils).%RunServerAuditCode(dashboardName)
   Do $$$AssertStatusOK(sc)
   Set sc = ##class(%DeepSee.Utils).%RunServerAuditCode(dashboardName)
   Do $$$AssertStatusOK(sc)
-  Do $$$AssertEquals(##class(DHA.BI.CubeCacheWarmer.DashboardUsage).GetOpenCount(dashboardName),2)
+  Do $$$AssertEquals(##class(dha.bi.CubeCacheWarmer.DashboardUsage).GetOpenCount(dashboardName),2)
 
-  Set usage = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%OpenId(dashboardName,,.openSC)
+  Set usage = ##class(dha.bi.CubeCacheWarmer.Model.DashboardUsage).%OpenId(dashboardName,,.openSC)
   Do $$$AssertStatusOK(openSC)
   Do $$$AssertTrue($IsObject(usage))
   Do $$$AssertNotEquals(usage.FirstOpenedAt,"")
   Do $$$AssertNotEquals(usage.LastOpenedAt,"")
 
-  Set cleanupSC = ##class(DHA.BI.CubeCacheWarmer.Model.DashboardUsage).%DeleteId(dashboardName)
+  Set cleanupSC = ##class(dha.bi.CubeCacheWarmer.Model.DashboardUsage).%DeleteId(dashboardName)
   Do $$$AssertStatusOK(cleanupSC)
 }
 
@@ -56,14 +56,14 @@ Method TestInstallerPreservesExistingAuditCommand()
   Set priorCommand = "set tDHABICubeCacheWarmerPriorAudit=1"
   Set ^DeepSee.AuditCode = priorCommand
 
-  Set sc = ##class(DHA.BI.CubeCacheWarmer.Installer).Install()
+  Set sc = ##class(dha.bi.CubeCacheWarmer.Installer).Install()
   Do $$$AssertStatusOK(sc)
-  Do $$$AssertTrue(^DeepSee.AuditCode[$Parameter("DHA.BI.CubeCacheWarmer.DashboardUsage","AUDITCOMMAND"))
+  Do $$$AssertTrue(^DeepSee.AuditCode[$Parameter("dha.bi.CubeCacheWarmer.DashboardUsage","AUDITCOMMAND"))
   Do $$$AssertTrue(^DeepSee.AuditCode[priorCommand)
 
   Set laterCommand = "set tDHABICubeCacheWarmerLaterAudit=1"
   Set ^DeepSee.AuditCode = laterCommand_" "_^DeepSee.AuditCode
-  Set sc = ##class(DHA.BI.CubeCacheWarmer.Installer).Uninstall()
+  Set sc = ##class(dha.bi.CubeCacheWarmer.Installer).Uninstall()
   Do $$$AssertStatusOK(sc)
   Do $$$AssertEquals(^DeepSee.AuditCode,laterCommand_" "_priorCommand)
 
@@ -85,20 +85,20 @@ Method TestQueryFrequencyAuditHook()
   Do $$$AssertStatusOK(sc)
   Set queryKey = result.%GetQueryKey()
 
-  If ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%ExistsId(queryKey) {
-    Set cleanupSC = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%DeleteId(queryKey)
+  If ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%ExistsId(queryKey) {
+    Set cleanupSC = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%DeleteId(queryKey)
     Do $$$AssertStatusOK(cleanupSC)
   }
 
-  Set sc = ##class(DHA.BI.CubeCacheWarmer.Installer).Install()
+  Set sc = ##class(dha.bi.CubeCacheWarmer.Installer).Install()
   Do $$$AssertStatusOK(sc)
-  Do $$$AssertTrue(^DeepSee.AuditQueryCode[$Parameter("DHA.BI.CubeCacheWarmer.QueryUsage","AUDITCOMMAND"))
+  Do $$$AssertTrue(^DeepSee.AuditQueryCode[$Parameter("dha.bi.CubeCacheWarmer.QueryUsage","AUDITCOMMAND"))
 
   Set ^DeepSee.QueryLog(logUser,1) = mdx
   Xecute ^DeepSee.AuditQueryCode
   Set ^DeepSee.QueryLog(logUser,2) = mdx
   Xecute ^DeepSee.AuditQueryCode
-  Set usage = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%OpenId(queryKey,,.openSC)
+  Set usage = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%OpenId(queryKey,,.openSC)
   Do $$$AssertStatusOK(openSC)
   Do $$$AssertEquals(usage.ExecutionCount,2)
 
@@ -106,10 +106,10 @@ Method TestQueryFrequencyAuditHook()
   Set ^DeepSee.QueryLog(logUser,3) = mdx
   Xecute ^DeepSee.AuditQueryCode
   Kill ^||DHABICCW.CacheWarmer("active")
-  Set usage = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%OpenId(queryKey,,.openSC)
+  Set usage = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%OpenId(queryKey,,.openSC)
   Do $$$AssertEquals(usage.ExecutionCount,2)
 
-  Set cleanupSC = ##class(DHA.BI.CubeCacheWarmer.Model.QueryUsage).%DeleteId(queryKey)
+  Set cleanupSC = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%DeleteId(queryKey)
   Do $$$AssertStatusOK(cleanupSC)
   Kill ^DeepSee.QueryLog(logUser),^DHABICCW.QueryLogCheckpoint(logUser)
 }
@@ -120,14 +120,14 @@ Method TestInstallerPreservesExistingQueryAuditCommand()
   Set priorCommand = "set tDHABICubeCacheWarmerPriorQueryAudit=1"
   Set ^DeepSee.AuditQueryCode = priorCommand
 
-  Set sc = ##class(DHA.BI.CubeCacheWarmer.Installer).Install()
+  Set sc = ##class(dha.bi.CubeCacheWarmer.Installer).Install()
   Do $$$AssertStatusOK(sc)
-  Do $$$AssertTrue(^DeepSee.AuditQueryCode[$Parameter("DHA.BI.CubeCacheWarmer.QueryUsage","AUDITCOMMAND"))
+  Do $$$AssertTrue(^DeepSee.AuditQueryCode[$Parameter("dha.bi.CubeCacheWarmer.QueryUsage","AUDITCOMMAND"))
   Do $$$AssertTrue(^DeepSee.AuditQueryCode[priorCommand)
 
   Set laterCommand = "set tDHABICubeCacheWarmerLaterQueryAudit=1"
   Set ^DeepSee.AuditQueryCode = laterCommand_" "_^DeepSee.AuditQueryCode
-  Set sc = ##class(DHA.BI.CubeCacheWarmer.QueryUsage).Uninstall()
+  Set sc = ##class(dha.bi.CubeCacheWarmer.QueryUsage).Uninstall()
   Do $$$AssertStatusOK(sc)
   Do $$$AssertEquals(^DeepSee.AuditQueryCode,laterCommand_" "_priorCommand)
 
@@ -138,15 +138,43 @@ Method TestInstallerPreservesExistingQueryAuditCommand()
   }
 }
 
+Method TestInstallerMigratesLegacyAuditCommands()
+{
+  Set savedDashboardAudit = $Get(^DeepSee.AuditCode)
+  Set savedQueryAudit = $Get(^DeepSee.AuditQueryCode)
+  Set legacyDashboardAudit = $Parameter("dha.bi.CubeCacheWarmer.DashboardUsage","LEGACYAUDITCOMMAND")
+  Set legacyQueryAudit = $Parameter("dha.bi.CubeCacheWarmer.QueryUsage","LEGACYAUDITCOMMAND")
+  Set ^DeepSee.AuditCode = legacyDashboardAudit
+  Set ^DeepSee.AuditQueryCode = legacyQueryAudit
+
+  Set sc = ##class(dha.bi.CubeCacheWarmer.Installer).Install()
+  Do $$$AssertStatusOK(sc)
+  Do $$$AssertTrue(^DeepSee.AuditCode[$Parameter("dha.bi.CubeCacheWarmer.DashboardUsage","AUDITCOMMAND"))
+  Do $$$AssertTrue('(^DeepSee.AuditCode[legacyDashboardAudit))
+  Do $$$AssertTrue(^DeepSee.AuditQueryCode[$Parameter("dha.bi.CubeCacheWarmer.QueryUsage","AUDITCOMMAND"))
+  Do $$$AssertTrue('(^DeepSee.AuditQueryCode[legacyQueryAudit))
+
+  If savedDashboardAudit="" {
+    Kill ^DeepSee.AuditCode
+  } Else {
+    Set ^DeepSee.AuditCode = savedDashboardAudit
+  }
+  If savedQueryAudit="" {
+    Kill ^DeepSee.AuditQueryCode
+  } Else {
+    Set ^DeepSee.AuditQueryCode = savedQueryAudit
+  }
+}
+
 Method TestStatsArePersistent()
 {
   Kill parameters,stats
-  Set sc = ##class(DHA.BI.CubeCacheWarmer.CacheWarmer).WarmMDX("",.parameters,0,.stats)
+  Set sc = ##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmMDX("",.parameters,0,.stats)
   Do $$$AssertStatusNotOK(sc)
   Set runId = $Get(stats("runId"),0)
   Do $$$AssertNotEquals(runId,0)
 
-  Set run = ##class(DHA.BI.CubeCacheWarmer.Model.CacheWarmRun).%OpenId(runId,,.openSC)
+  Set run = ##class(dha.bi.CubeCacheWarmer.Model.CacheWarmRun).%OpenId(runId,,.openSC)
   Do $$$AssertStatusOK(openSC)
   Do $$$AssertTrue($IsObject(run))
   Do $$$AssertEquals(run.Mode,"DirectMDX")
@@ -160,7 +188,7 @@ Method TestStatsArePersistent()
   Do $$$AssertEquals(query.DashboardOpenCount,0)
   Do $$$AssertEquals(query.PriorityOrder,0)
 
-  Set deleteSC = ##class(DHA.BI.CubeCacheWarmer.Model.CacheWarmRun).%DeleteId(runId)
+  Set deleteSC = ##class(dha.bi.CubeCacheWarmer.Model.CacheWarmRun).%DeleteId(runId)
   Do $$$AssertStatusOK(deleteSC)
 }
 

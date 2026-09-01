@@ -1,5 +1,5 @@
 /// Persistent audit record for one cache-warmer invocation.
-Class DHA.BI.CubeCacheWarmer.Model.CacheWarmRun Extends (%Persistent, %JSON.Adaptor)
+Class dha.bi.CubeCacheWarmer.Model.CacheWarmRun Extends (%Persistent, %JSON.Adaptor)
 {
 
 Property CubeName As %String(MAXLEN = 128);
@@ -28,7 +28,7 @@ Property ElapsedSeconds As %Double [ InitialExpression = 0 ];
 
 Property StatusText As %String(MAXLEN = 4096);
 
-Relationship Queries As DHA.BI.CubeCacheWarmer.Model.CacheWarmQuery [ Cardinality = children, Inverse = Run ];
+Relationship Queries As dha.bi.CubeCacheWarmer.Model.CacheWarmQuery [ Cardinality = children, Inverse = Run ];
 
 Index CubeStartedIndex On (CubeName, StartedAt);
 
