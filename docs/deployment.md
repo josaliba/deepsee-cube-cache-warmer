@@ -61,19 +61,26 @@ the team's release policy.
 
 ## Install with InterSystems Package Manager
 
-Clone the repository, or extract the package archive, to a path visible from
-the target IRIS instance. In an ObjectScript terminal connected to the target
-Analytics namespace, load whichever directory contains `module.xml`:
-
-```objectscript
-zpm "load /path/to/deepsee-cube-cache-warmer"
-```
-
-Once the module is published to the community package registry, it can be
-installed without a local copy:
+The module is published in the
+[community package registry](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer).
+In an ObjectScript terminal connected to the target Analytics namespace:
 
 ```objectscript
 zpm "install iris-bi-cube-cache-warmer"
+```
+
+To pin a specific release, append the version:
+
+```objectscript
+zpm "install iris-bi-cube-cache-warmer 1.0.0"
+```
+
+For an instance without registry access, or to install unreleased changes,
+clone the repository or extract the package archive to a path visible from the
+IRIS instance and load whichever directory contains `module.xml`:
+
+```objectscript
+zpm "load /path/to/deepsee-cube-cache-warmer"
 ```
 
 The IPM module:
@@ -222,8 +229,15 @@ warming.
 
 ## Upgrade
 
-For an IPM installation, deploy the updated directory or artifact and load it in
-the same namespace:
+For a registry installation, update in place in the same namespace:
+
+```objectscript
+zpm "install iris-bi-cube-cache-warmer"
+```
+
+IPM reinstalls the latest published version over the existing one; the
+module's Activate hook re-runs the idempotent installer. For a local
+installation, deploy the updated directory or artifact and load it again:
 
 ```objectscript
 zpm "load /path/to/deepsee-cube-cache-warmer"

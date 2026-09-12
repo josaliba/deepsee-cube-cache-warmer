@@ -1,5 +1,9 @@
 # DeepSee Cube Cache Warmer
 
+[![IPM](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer/badge.svg)](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer)
+[![Open Exchange](https://img.shields.io/badge/Open%20Exchange-iris--bi--cube--cache--warmer-00b2a9)](https://openexchange.intersystems.com/package/iris-bi-cube-cache-warmer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 True query-frequency-aware cache warming for InterSystems IRIS Business Intelligence
 (formerly DeepSee). The reusable `dc.bi.CubeCacheWarmer` package executes saved
 dashboard and pivot queries after cube builds or synchronizations so IRIS can
@@ -17,11 +21,13 @@ Source and issues: <https://github.com/josaliba/deepsee-cube-cache-warmer>. Lice
 
 ## Install the package with IPM
 
-Clone the repository and load it from an ObjectScript terminal connected to
-the target Analytics namespace:
+The module is published in the
+[InterSystems community package registry](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer)
+as `iris-bi-cube-cache-warmer`. From an ObjectScript terminal connected to the
+target Analytics namespace:
 
 ```objectscript
-zpm "load /path/to/deepsee-cube-cache-warmer"
+zpm "install iris-bi-cube-cache-warmer"
 ```
 
 Then set each cube's Cube Manager Post-Build and Post-Synchronize code to:
@@ -30,8 +36,8 @@ Then set each cube's Cube Manager Post-Build and Post-Synchronize code to:
 do ##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
 ```
 
-Once the module is published to the InterSystems community package registry,
-`zpm "install iris-bi-cube-cache-warmer"` installs it directly. See
+To install from a clone instead, for example to try unreleased changes, run
+`zpm "load /path/to/deepsee-cube-cache-warmer"`. See
 [deployment.md](docs/deployment.md) for source-based installation, upgrade,
 verification, and uninstall.
 

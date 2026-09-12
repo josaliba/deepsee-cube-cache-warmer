@@ -45,8 +45,15 @@ own `module.xml` and license for distribution.
 
 ## Install with InterSystems Package Manager
 
-With an IPM client installed, run this from the target Analytics namespace,
-pointing at either the cloned repository root or an extracted package archive:
+With an IPM client installed, run this from the target Analytics namespace to
+install the published module from the community package registry:
+
+```objectscript
+zpm "install iris-bi-cube-cache-warmer"
+```
+
+To install from a local copy instead, point `load` at either the cloned
+repository root or an extracted package archive:
 
 ```objectscript
 zpm "load /path/to/deepsee-cube-cache-warmer"
