@@ -1,9 +1,9 @@
-name: disease-registry
+name: ccw-demo
 
 services:
   iris-volume-init:
-    image: disease-registry-iris:dev
-    container_name: disease-registry-iris-volume-init
+    image: ccw-demo-iris:dev
+    container_name: ccw-demo-iris-volume-init
     user: "0:0"
     entrypoint:
       - /bin/sh
@@ -20,9 +20,9 @@ services:
       dockerfile: Dockerfile
       args:
         IRIS_IMAGE: ${IRIS_IMAGE:-containers.intersystems.com/intersystems/iris-community:latest-em}
-    image: disease-registry-iris:dev
-    container_name: disease-registry-iris
-    hostname: disease-registry
+    image: ccw-demo-iris:dev
+    container_name: ccw-demo-iris
+    hostname: ccw-demo
     init: true
     restart: unless-stopped
     depends_on:
@@ -32,10 +32,10 @@ services:
       - --check-caps
       - "false"
       - --after
-      - /opt/disease-registry/docker/bootstrap.sh
+      - /opt/ccw-demo/docker/bootstrap.sh
     environment:
       ISC_DATA_DIRECTORY: /durable/config
-      ISC_CPF_MERGE_FILE: /opt/disease-registry/docker/merge.cpf
+      ISC_CPF_MERGE_FILE: /opt/ccw-demo/docker/merge.cpf
     ports:
       - "${IRIS_SUPERSERVER_PORT:-1972}:1972"
     volumes:
@@ -47,8 +47,8 @@ services:
 
   webgateway:
     image: ${WEBGATEWAY_IMAGE:-containers.intersystems.com/intersystems/webgateway:latest-em}
-    container_name: disease-registry-webgateway
-    hostname: disease-registry-webgateway
+    container_name: ccw-demo-webgateway
+    hostname: ccw-demo-webgateway
     init: true
     restart: unless-stopped
     depends_on:
@@ -67,6 +67,6 @@ services:
 
 volumes:
   iris-data:
-    name: disease-registry-iris-data
+    name: ccw-demo-iris-data
   webgateway-data:
-    name: disease-registry-webgateway-data
+    name: ccw-demo-webgateway-data

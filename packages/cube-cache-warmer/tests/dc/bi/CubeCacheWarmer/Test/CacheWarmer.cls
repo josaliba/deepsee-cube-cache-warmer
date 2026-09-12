@@ -76,7 +76,7 @@ Method TestInstallerPreservesExistingAuditCommand()
 
 Method TestQueryFrequencyAuditHook()
 {
-  Set mdx = "SELECT {[Measures].[%Count]} ON 0 FROM [DiseaseRegistryPatients]"
+  Set mdx = "SELECT {[Measures].[%Count]} ON 0 FROM [DemoPatients]"
   Set logUser = "CCWUnitTest"
   Kill ^DeepSee.QueryLog(logUser),^dc.bi.CCW.QueryLogCheckpoint(logUser)
   Kill variables

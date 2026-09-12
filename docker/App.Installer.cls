@@ -8,8 +8,8 @@ XData Setup
 <Manifest>
   <Default Name="SourceDir" Value="/workspace/src"/>
   <Default Name="CacheWarmerModuleDir" Value="/workspace/"/>
-  <Default Name="Namespace" Value="DISEASEREGISTRY"/>
-  <Default Name="DatabaseDir" Value="/durable/databases/DISEASEREGISTRY"/>
+  <Default Name="Namespace" Value="CCWDEMO"/>
+  <Default Name="DatabaseDir" Value="/durable/databases/CCWDEMO"/>
   <Namespace Name="${Namespace}" Code="${Namespace}" Data="${Namespace}" Create="yes" Ensemble="1">
     <Configuration>
       <Database Name="${Namespace}" Dir="${DatabaseDir}" Create="yes" Resource="%DB_${Namespace}"/>
@@ -29,12 +29,12 @@ ClassMethod Bootstrap() As %Status
   Set sc = ##class(Security.Users).UnExpireUserPasswords("_SYSTEM,SuperUser", .updatedUsers)
   If $SYSTEM.Status.IsError(sc) Quit sc
 
-  If '##class(%SYS.Namespace).Exists("DISEASEREGISTRY") {
+  If '##class(%SYS.Namespace).Exists("CCWDEMO") {
     Set sc = ..Setup()
     If $SYSTEM.Status.IsError(sc) Quit sc
-  } ElseIf '##class(%Library.EnsembleMgr).IsEnsembleNamespace("DISEASEREGISTRY") {
+  } ElseIf '##class(%Library.EnsembleMgr).IsEnsembleNamespace("CCWDEMO") {
     // Upgrade volumes created by a bootstrap that used Ensemble="0".
-    Set sc = ##class(%Library.EnsembleMgr).EnableNamespace("DISEASEREGISTRY", 1)
+    Set sc = ##class(%Library.EnsembleMgr).EnableNamespace("CCWDEMO", 1)
     If $SYSTEM.Status.IsError(sc) Quit sc
   }
 
@@ -42,11 +42,11 @@ ClassMethod Bootstrap() As %Status
   // older image predates that, so install IPM at runtime when it is missing.
   Set sc = ..EnsureIPM()
   If $SYSTEM.Status.IsError(sc) Quit sc
-  Set sc = ..EnableIPMInNamespace("DISEASEREGISTRY")
+  Set sc = ..EnableIPMInNamespace("CCWDEMO")
   If $SYSTEM.Status.IsError(sc) Quit sc
 
   Set previousNamespace = $Namespace
-  Set $Namespace = "DISEASEREGISTRY"
+  Set $Namespace = "CCWDEMO"
   // Load the cache warmer through its module.xml with IPM, exactly as an end
   // user would, so the demo exercises the published module definition. The
   // module's Activate hook installs both audit commands.
@@ -57,7 +57,7 @@ ClassMethod Bootstrap() As %Status
     Set sc = $SYSTEM.OBJ.Import("/workspace/src", "ck/recurse=1/extensions=cls")
   }
   If '$SYSTEM.Status.IsError(sc) {
-    Set sc = ##class(%DeepSee.CubeManager.Utils).SetActiveRegistry("DiseaseRegistry.CubeRegistry", 1)
+    Set sc = ##class(%DeepSee.CubeManager.Utils).SetActiveRegistry("Demo.CubeRegistry", 1)
   }
   If '$SYSTEM.Status.IsError(sc) {
     Set sc = ##class(%DeepSee.CubeManager.Utils).ScheduleUpdaterTasks()

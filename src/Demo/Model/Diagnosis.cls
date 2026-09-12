@@ -1,13 +1,13 @@
-Class DiseaseRegistry.Model.Diagnosis Extends (%Persistent, %JSON.Adaptor)
+Class Demo.Model.Diagnosis Extends (%Persistent, %JSON.Adaptor)
 {
 
 /// Track every source-row change for incremental synchronization of the
-/// DiseaseRegistryDiagnoses cube.
+/// DemoDiagnoses cube.
 Parameter DSTIME = "AUTO";
 
 Parameter DSINTERVAL = 5;
 
-Property Patient As DiseaseRegistry.Model.Patient [ Required ];
+Property Patient As Demo.Model.Patient [ Required ];
 
 Property DiseaseCode As %String(MAXLEN = 20) [ Required ];
 

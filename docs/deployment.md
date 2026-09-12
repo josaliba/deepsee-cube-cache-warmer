@@ -16,7 +16,7 @@ Cube Manager registry.
 - A runtime identity allowed to query the cubes and execute the saved MDX.
 
 The package test suite has been verified on InterSystems IRIS 2025.1.5. The
-Disease Registry demo also verifies the IRIS 2025.1 Cube Manager hook and
+Docker demo also verifies the IRIS 2025.1 Cube Manager hook and
 registry integration used by the background warmer.
 
 Install the package separately into every namespace where it will be used. Its

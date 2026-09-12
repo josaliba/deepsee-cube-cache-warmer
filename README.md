@@ -10,7 +10,7 @@ This repository contains both:
 - a standalone, application-neutral cache-warmer package under
   [`packages/cube-cache-warmer`](packages/cube-cache-warmer/README.md),
   described by the IPM [`module.xml`](module.xml) at the repository root; and
-- a complete Docker Compose disease-registry demo with two synchronized cubes,
+- a complete Docker Compose demo with two synchronized cubes,
   saved pivots, a dashboard with default filters, tests, and operational helpers.
 
 Source and issues: <https://github.com/josaliba/deepsee-cube-cache-warmer>. Licensed under the [MIT License](LICENSE).
@@ -145,14 +145,14 @@ that upgrade path on IRIS 2026.1.
 ## Repository layout
 
 ```text
-module.xml                          IPM module definition for the standalone package
-LICENSE                             MIT License
+module.xml                 IPM module definition for the standalone package
+LICENSE                    MIT License
 packages/cube-cache-warmer/  Standalone package sources and unit tests
-src/DiseaseRegistry/                Demo models, cubes, registry, and helpers
-tests/DiseaseRegistry/              Demo smoke and cube-registry tests
-docker/                             Fresh-volume bootstrap and installer
-bin/                                Start, stop, test, terminal, and package scripts
-docs/                               Demo, architecture, deployment, and operations guides
+src/Demo/                  Demo models, cubes, registry, and helpers
+tests/Demo/                Demo smoke and cube-registry tests
+docker/                    Fresh-volume bootstrap and installer
+bin/                       Start, stop, test, terminal, and package scripts
+docs/                      Demo, architecture, deployment, and operations guides
 ```
 
 ## Quick start
@@ -187,7 +187,7 @@ The start command returns after the containers start; first-time IRIS bootstrap
 continues asynchronously. Wait until the logs show:
 
 ```text
-Disease Registry bootstrap complete.
+Cube Cache Warmer Demo bootstrap complete.
 ```
 
 Then open an IRIS terminal and create the deterministic demo:
@@ -197,7 +197,7 @@ Then open an IRIS terminal and create the deterministic demo:
 ```
 
 ```objectscript
-set sc=##class(DiseaseRegistry.Util.Analytics).SetupDemo(50,500,1,1)
+set sc=##class(Demo.Util.Analytics).SetupDemo(50,500,1,1)
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
@@ -214,7 +214,7 @@ Local endpoints and development credentials:
 
 - Management Portal: <http://localhost:52773/csp/sys/UtilHome.csp>
 - IRIS SuperServer: `localhost:1972`
-- Namespace: `DISEASEREGISTRY`
+- Namespace: `CCWDEMO`
 - Development user: `_SYSTEM`
 - Development password: `SYS`
 
@@ -254,7 +254,7 @@ instructions.
 ```bash
 ./bin/start                    # Build and start the demo stack
 ./bin/logs                     # Follow IRIS/bootstrap logs
-./bin/terminal                 # Open DISEASEREGISTRY ObjectScript terminal
+./bin/terminal                 # Open CCWDEMO ObjectScript terminal
 ./bin/test                     # Compile and run package and demo tests
 ./bin/package-cache-warmer     # Create the standalone package archive
 ./bin/stop                     # Stop containers and preserve their volumes

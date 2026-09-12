@@ -18,7 +18,7 @@
     {
       "label": "IRIS: Terminal",
       "type": "shell",
-      "command": "docker compose exec iris iris session IRIS -U DISEASEREGISTRY",
+      "command": "docker compose exec iris iris session IRIS -U CCWDEMO",
       "problemMatcher": []
     },
     {

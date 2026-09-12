@@ -1,12 +1,12 @@
-Class DiseaseRegistry.Cube.Diagnosis Extends %DeepSee.CubeDefinition [ DependsOn = DiseaseRegistry.Model.Diagnosis ]
+Class Demo.Cube.Diagnosis Extends %DeepSee.CubeDefinition [ DependsOn = Demo.Model.Diagnosis ]
 {
 
 XData Cube [ XMLNamespace = "http://www.intersystems.com/deepsee" ]
 {
-<cube name="DiseaseRegistryDiagnoses"
-      caption="Disease Registry Diagnoses"
+<cube name="DemoDiagnoses"
+      caption="Cube Cache Warmer Demo Diagnoses"
       owner="_SYSTEM"
-      sourceClass="DiseaseRegistry.Model.Diagnosis">
+      sourceClass="Demo.Model.Diagnosis">
 
   <measure name="Notifiable Cases"
            sourceProperty="Notifiable"

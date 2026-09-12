@@ -1,4 +1,4 @@
-Class DiseaseRegistry.Test.Analytics Extends %UnitTest.TestCase
+Class Demo.Test.Analytics Extends %UnitTest.TestCase
 {
 
 Method TestInteroperabilityEnabled()
@@ -8,25 +8,25 @@ Method TestInteroperabilityEnabled()
 
 Method TestSynchronizationIsEnabled()
 {
-  Do $$$AssertEquals($Parameter("DiseaseRegistry.Model.Patient","DSTIME"), "AUTO")
-  Do $$$AssertEquals($Parameter("DiseaseRegistry.Model.Diagnosis","DSTIME"), "AUTO")
+  Do $$$AssertEquals($Parameter("Demo.Model.Patient","DSTIME"), "AUTO")
+  Do $$$AssertEquals($Parameter("Demo.Model.Diagnosis","DSTIME"), "AUTO")
 }
 
 Method TestCubeRegistration()
 {
-  Set patientClass = ##class(%DeepSee.Utils).%GetCubeClass("DiseaseRegistryPatients",.patientSC)
+  Set patientClass = ##class(%DeepSee.Utils).%GetCubeClass("DemoPatients",.patientSC)
   Do $$$AssertStatusOK(patientSC)
-  Do $$$AssertEquals(patientClass, "DiseaseRegistry.Cube.Patient")
+  Do $$$AssertEquals(patientClass, "Demo.Cube.Patient")
 
-  Set diagnosisClass = ##class(%DeepSee.Utils).%GetCubeClass("DiseaseRegistryDiagnoses",.diagnosisSC)
+  Set diagnosisClass = ##class(%DeepSee.Utils).%GetCubeClass("DemoDiagnoses",.diagnosisSC)
   Do $$$AssertStatusOK(diagnosisSC)
-  Do $$$AssertEquals(diagnosisClass, "DiseaseRegistry.Cube.Diagnosis")
+  Do $$$AssertEquals(diagnosisClass, "Demo.Cube.Diagnosis")
 }
 
 Method TestCubeManagerRegistry()
 {
   Set registry = ##class(%DeepSee.CubeManager.Utils).GetActiveRegistry()
-  Do $$$AssertEquals(registry, "DiseaseRegistry.CubeRegistry")
+  Do $$$AssertEquals(registry, "Demo.CubeRegistry")
 
   Set map = ##class(%DeepSee.CubeManager.Utils).BuildRegistryMap(.sc,registry,1,.lookup)
   Do $$$AssertStatusOK(sc)

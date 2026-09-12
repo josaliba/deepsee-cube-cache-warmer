@@ -1,7 +1,7 @@
 # Install and run the demo
 
 This guide creates a disposable local IRIS Community Edition environment,
-installs the standalone cache-warmer package, loads the Disease Registry demo,
+installs the standalone cache-warmer package, loads the demo application,
 builds its two cubes, and verifies cache warming.
 
 The environment is for local development only. It uses known credentials,
@@ -13,14 +13,14 @@ The demo installs:
 
 | Component | Name |
 | --- | --- |
-| Namespace and database | `DISEASEREGISTRY` |
-| Patient source class | `DiseaseRegistry.Model.Patient` |
-| Diagnosis source class | `DiseaseRegistry.Model.Diagnosis` |
-| Patient cube | `DiseaseRegistryPatients` |
-| Diagnosis cube | `DiseaseRegistryDiagnoses` |
-| Patient pivot | `Disease Registry/Patients by Status.pivot` |
-| Diagnosis pivot | `Disease Registry/Diagnoses by Group.pivot` |
-| Dashboard | `Disease Registry/Patient Overview.dashboard` |
+| Namespace and database | `CCWDEMO` |
+| Patient source class | `Demo.Model.Patient` |
+| Diagnosis source class | `Demo.Model.Diagnosis` |
+| Patient cube | `DemoPatients` |
+| Diagnosis cube | `DemoDiagnoses` |
+| Patient pivot | `Cube Cache Warmer Demo/Patients by Status.pivot` |
+| Diagnosis pivot | `Cube Cache Warmer Demo/Diagnoses by Group.pivot` |
+| Dashboard | `Cube Cache Warmer Demo/Patient Overview.dashboard` |
 
 Both source classes use DSTIME, allowing changes to be synchronized into the
 cubes without rebuilding every fact.
@@ -81,13 +81,13 @@ First-time bootstrap continues after `./bin/start` returns. Follow the IRIS log:
 Do not run the demo or tests until this line appears:
 
 ```text
-Disease Registry bootstrap complete.
+Cube Cache Warmer Demo bootstrap complete.
 ```
 
 Bootstrap performs the following work:
 
 1. Creates durable IRIS system storage.
-2. Creates the `DISEASEREGISTRY` database and namespace.
+2. Creates the `CCWDEMO` database and namespace.
 3. Enables the namespace for interoperability and Analytics.
 4. Installs InterSystems Package Manager (IPM) if the durable volume predates
    the image that ships it.
@@ -95,12 +95,12 @@ Bootstrap performs the following work:
    Activate hook installs the dashboard-open and normalized-query-frequency
    audit hooks.
 6. Imports and compiles the demo application.
-7. Activates `DiseaseRegistry.CubeRegistry` and updater tasks.
+7. Activates `Demo.CubeRegistry` and updater tasks.
 
 ## Open the development environment
 
 - Management Portal: <http://localhost:52773/csp/sys/UtilHome.csp>
-- Namespace: `DISEASEREGISTRY`
+- Namespace: `CCWDEMO`
 - Username: `_SYSTEM`
 - Password: `SYS`
 
@@ -110,14 +110,14 @@ Open an ObjectScript terminal with:
 ./bin/terminal
 ```
 
-The terminal opens directly in `DISEASEREGISTRY`.
+The terminal opens directly in `CCWDEMO`.
 
 ## Create the demo data and BI content
 
 In the ObjectScript terminal, run:
 
 ```objectscript
-set sc=##class(DiseaseRegistry.Util.Analytics).SetupDemo(50,500,1,1)
+set sc=##class(Demo.Util.Analytics).SetupDemo(50,500,1,1)
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
@@ -149,7 +149,7 @@ Source rows: 50 patients; 500 diagnoses.
 
 The dashboard patient-status widget has two opening defaults:
 
-- `@DiseaseRegistryDefaultStatus`, resolved to `Active` in the demo context.
+- `@DemoDefaultStatus`, resolved to `Active` in the demo context.
 - Emirate set to `Dubai`.
 
 The warmer executes both the saved base pivot and the default-filter variant.
@@ -167,12 +167,12 @@ Both suites should report `All PASSED`.
 From the ObjectScript terminal, verify source counts:
 
 ```objectscript
-set sc=##class(DiseaseRegistry.Util.Analytics).ShowCounts()
+set sc=##class(Demo.Util.Analytics).ShowCounts()
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
 Inspect recent warmer runs in the Management Portal SQL page while using the
-`DISEASEREGISTRY` namespace:
+`CCWDEMO` namespace:
 
 ```sql
 SELECT TOP 20 %ID AS RunId, CubeName, Mode, Outcome,
@@ -206,14 +206,14 @@ interpretation.
 Generate deterministic inserts, updates, and deletes:
 
 ```objectscript
-set sc=##class(DiseaseRegistry.Util.Analytics).MakeChanges(10,6,2,3)
+set sc=##class(Demo.Util.Analytics).MakeChanges(10,6,2,3)
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
 Synchronize the cubes and run direct warming afterward:
 
 ```objectscript
-set sc=##class(DiseaseRegistry.Util.Analytics).SynchronizeAll(1)
+set sc=##class(Demo.Util.Analytics).SynchronizeAll(1)
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
@@ -228,7 +228,7 @@ registry contains enabled groups for both cubes and schedules updates every five
 minutes.
 
 If you change Cube Manager configuration, export the generated
-`DiseaseRegistry.CubeRegistry` class so the change survives a fresh
+`Demo.CubeRegistry` class so the change survives a fresh
 installation. The checked-in class deliberately uses the legacy
 `%DeepSee.CubeManager.RegistryDefinitionSuper` format required by IRIS 2025.1.
 Newer IRIS releases may upgrade the compiled class to `%DeepSee.CubeSchedule`;

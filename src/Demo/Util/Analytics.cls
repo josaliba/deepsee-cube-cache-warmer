@@ -1,7 +1,7 @@
 Include %occStatus
 
-/// Opt-in demo and operational helpers for Disease Registry BI cubes.
-Class DiseaseRegistry.Util.Analytics Extends %RegisteredObject
+/// Opt-in demo and operational helpers for Cube Cache Warmer Demo BI cubes.
+Class Demo.Util.Analytics Extends %RegisteredObject
 {
 
 /// Reset only demo model extents, generate deterministic data, build the cubes,
@@ -16,14 +16,14 @@ ClassMethod SetupDemo(pPatientCount As %Integer = 50, pDiagnosisCount As %Intege
     If $$$ISERR(tSC) Quit tSC
   }
 
-  &sql(SELECT COUNT(*) INTO :tPatients FROM DiseaseRegistry_Model.Patient)
+  &sql(SELECT COUNT(*) INTO :tPatients FROM Demo_Model.Patient)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to count patients. SQLCODE="_SQLCODE)
   If tPatients = 0 {
     Set tSC = ..SeedPatients(pPatientCount)
     If $$$ISERR(tSC) Quit tSC
   }
 
-  &sql(SELECT COUNT(*) INTO :tDiagnoses FROM DiseaseRegistry_Model.Diagnosis)
+  &sql(SELECT COUNT(*) INTO :tDiagnoses FROM Demo_Model.Diagnosis)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to count diagnoses. SQLCODE="_SQLCODE)
   If tDiagnoses = 0 {
     Set tSC = ..SeedDiagnoses(pDiagnosisCount)
@@ -44,13 +44,13 @@ ClassMethod SetupDemo(pPatientCount As %Integer = 50, pDiagnosisCount As %Intege
   Quit $$$OK
 }
 
-/// Delete only DiseaseRegistry.Model.Diagnosis and Patient data.
+/// Delete only Demo.Model.Diagnosis and Patient data.
 ClassMethod ResetDemo() As %Status
 {
   Set tSC = $$$OK
   Try {
-    Do ##class(DiseaseRegistry.Model.Diagnosis).%KillExtent()
-    Do ##class(DiseaseRegistry.Model.Patient).%KillExtent()
+    Do ##class(Demo.Model.Diagnosis).%KillExtent()
+    Do ##class(Demo.Model.Patient).%KillExtent()
   } Catch ex {
     Set tSC = ex.AsStatus()
   }
@@ -67,7 +67,7 @@ ClassMethod SeedPatients(pCount As %Integer = 50) As %Status
   Set tStartDate = $ZDATEH("1945-01-01",3)
 
   For i = 1:1:pCount {
-    Set tPatient = ##class(DiseaseRegistry.Model.Patient).%New()
+    Set tPatient = ##class(Demo.Model.Patient).%New()
     Set tPatient.MRN = "DR"_$TR($J(i,6)," ","0")
     Set tPatient.FullName = "Demo Patient "_i
     Set tPatient.DateOfBirth = tStartDate+((i*397)#25000)
@@ -99,16 +99,16 @@ ClassMethod CollectPatientIDs(Output pPatientIDs, Output pCount As %Integer) As 
 {
   Kill pPatientIDs
   Set pCount = 0
-  &sql(DECLARE DiseaseRegistryPatientIDs CURSOR FOR SELECT %ID FROM DiseaseRegistry_Model.Patient ORDER BY %ID)
-  &sql(OPEN DiseaseRegistryPatientIDs)
+  &sql(DECLARE DemoPatientIDs CURSOR FOR SELECT %ID FROM Demo_Model.Patient ORDER BY %ID)
+  &sql(OPEN DemoPatientIDs)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate patients. SQLCODE="_SQLCODE)
   For {
-    &sql(FETCH DiseaseRegistryPatientIDs INTO :tPatientID)
+    &sql(FETCH DemoPatientIDs INTO :tPatientID)
     Quit:SQLCODE'=0
     Set pPatientIDs($Increment(pCount)) = tPatientID
   }
   Set tFetchCode = SQLCODE
-  &sql(CLOSE DiseaseRegistryPatientIDs)
+  &sql(CLOSE DemoPatientIDs)
   If tFetchCode < 0 Quit $$$ERROR($$$GeneralError,"Unable to fetch patients. SQLCODE="_tFetchCode)
   Quit $$$OK
 }
@@ -124,11 +124,11 @@ ClassMethod CreateDiagnosis(pSequence As %Integer, ByRef pPatientIDs, pPatientCo
   Set tDisease = 1+((pSequence-1)#7)
   Set tDate = $ZDATEH("2024-01-01",3)+((pSequence*11)#1000)
 
-  Set tPatient = ##class(DiseaseRegistry.Model.Patient).%OpenId(pPatientIDs(1+((pSequence-1)#pPatientCount)),,.tSC)
+  Set tPatient = ##class(Demo.Model.Patient).%OpenId(pPatientIDs(1+((pSequence-1)#pPatientCount)),,.tSC)
   If $$$ISERR(tSC) Quit tSC
   If '$IsObject(tPatient) Quit $$$ERROR($$$GeneralError,"Unable to open diagnosis patient")
 
-  Set tDiagnosis = ##class(DiseaseRegistry.Model.Diagnosis).%New()
+  Set tDiagnosis = ##class(Demo.Model.Diagnosis).%New()
   Set tDiagnosis.Patient = tPatient
   Set tDiagnosis.DiseaseCode = $Piece(tCodes,",",tDisease)
   Set tDiagnosis.DiseaseName = $Piece(tNames,",",tDisease)
@@ -157,7 +157,7 @@ ClassMethod MakeChanges(pAdds As %Integer = 10, pUpdates As %Integer = 6, pDelet
   Set tSC = ..CollectPatientIDs(.tPatientIDs,.tPatientCount)
   If $$$ISERR(tSC) Quit tSC
   If (pAdds>0),(tPatientCount<1) Quit $$$ERROR($$$GeneralError,"No patients are available")
-  &sql(SELECT COALESCE(MAX(%ID),0) INTO :tMaxID FROM DiseaseRegistry_Model.Diagnosis)
+  &sql(SELECT COALESCE(MAX(%ID),0) INTO :tMaxID FROM Demo_Model.Diagnosis)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to inspect diagnoses. SQLCODE="_SQLCODE)
   For i = 1:1:pAdds {
     Set tSC = ..CreateDiagnosis(tMaxID+i,.tPatientIDs,tPatientCount)
@@ -173,13 +173,13 @@ ClassMethod UpdatePatients(pCount As %Integer = 3) As %Status
 {
   If pCount < 1 Quit $$$OK
   Set tSC = $$$OK, tDone = 0
-  &sql(DECLARE DiseaseRegistryUpdatePatients CURSOR FOR SELECT %ID FROM DiseaseRegistry_Model.Patient ORDER BY %ID DESC)
-  &sql(OPEN DiseaseRegistryUpdatePatients)
+  &sql(DECLARE DemoUpdatePatients CURSOR FOR SELECT %ID FROM Demo_Model.Patient ORDER BY %ID DESC)
+  &sql(OPEN DemoUpdatePatients)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to update patients. SQLCODE="_SQLCODE)
   For {
-    &sql(FETCH DiseaseRegistryUpdatePatients INTO :tID)
+    &sql(FETCH DemoUpdatePatients INTO :tID)
     Quit:SQLCODE'=0
-    Set tPatient = ##class(DiseaseRegistry.Model.Patient).%OpenId(tID,,.tOpenSC)
+    Set tPatient = ##class(Demo.Model.Patient).%OpenId(tID,,.tOpenSC)
     If $$$ISERR(tOpenSC) Set tSC=tOpenSC Quit
     Set tPatient.RegistryStatus = $Select(tPatient.RegistryStatus="Active":"Inactive",1:"Active")
     Set tSC = tPatient.%Save()
@@ -187,7 +187,7 @@ ClassMethod UpdatePatients(pCount As %Integer = 3) As %Status
     Set tDone = tDone+1
     Quit:tDone>=pCount
   }
-  &sql(CLOSE DiseaseRegistryUpdatePatients)
+  &sql(CLOSE DemoUpdatePatients)
   Quit tSC
 }
 
@@ -195,13 +195,13 @@ ClassMethod UpdateDiagnoses(pCount As %Integer = 6) As %Status
 {
   If pCount < 1 Quit $$$OK
   Set tSC = $$$OK, tDone = 0
-  &sql(DECLARE DiseaseRegistryUpdateDiagnoses CURSOR FOR SELECT %ID FROM DiseaseRegistry_Model.Diagnosis ORDER BY %ID DESC)
-  &sql(OPEN DiseaseRegistryUpdateDiagnoses)
+  &sql(DECLARE DemoUpdateDiagnoses CURSOR FOR SELECT %ID FROM Demo_Model.Diagnosis ORDER BY %ID DESC)
+  &sql(OPEN DemoUpdateDiagnoses)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to update diagnoses. SQLCODE="_SQLCODE)
   For {
-    &sql(FETCH DiseaseRegistryUpdateDiagnoses INTO :tID)
+    &sql(FETCH DemoUpdateDiagnoses INTO :tID)
     Quit:SQLCODE'=0
-    Set tDiagnosis = ##class(DiseaseRegistry.Model.Diagnosis).%OpenId(tID,,.tOpenSC)
+    Set tDiagnosis = ##class(Demo.Model.Diagnosis).%OpenId(tID,,.tOpenSC)
     If $$$ISERR(tOpenSC) Set tSC=tOpenSC Quit
     Set tDiagnosis.Severity = $Select(tDiagnosis.Severity="Severe":"Moderate",1:"Severe")
     Set tDiagnosis.DiagnosisStatus = "Confirmed"
@@ -210,7 +210,7 @@ ClassMethod UpdateDiagnoses(pCount As %Integer = 6) As %Status
     Set tDone = tDone+1
     Quit:tDone>=pCount
   }
-  &sql(CLOSE DiseaseRegistryUpdateDiagnoses)
+  &sql(CLOSE DemoUpdateDiagnoses)
   Quit tSC
 }
 
@@ -218,37 +218,37 @@ ClassMethod DeleteDiagnoses(pCount As %Integer = 2) As %Status
 {
   If pCount < 1 Quit $$$OK
   Set tSC = $$$OK, tDone = 0
-  &sql(DECLARE DiseaseRegistryDeleteDiagnoses CURSOR FOR SELECT %ID FROM DiseaseRegistry_Model.Diagnosis ORDER BY %ID DESC)
-  &sql(OPEN DiseaseRegistryDeleteDiagnoses)
+  &sql(DECLARE DemoDeleteDiagnoses CURSOR FOR SELECT %ID FROM Demo_Model.Diagnosis ORDER BY %ID DESC)
+  &sql(OPEN DemoDeleteDiagnoses)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to delete diagnoses. SQLCODE="_SQLCODE)
   For {
-    &sql(FETCH DiseaseRegistryDeleteDiagnoses INTO :tID)
+    &sql(FETCH DemoDeleteDiagnoses INTO :tID)
     Quit:SQLCODE'=0
-    Set tSC = ##class(DiseaseRegistry.Model.Diagnosis).%DeleteId(tID)
+    Set tSC = ##class(Demo.Model.Diagnosis).%DeleteId(tID)
     Quit:$$$ISERR(tSC)
     Set tDone = tDone+1
     Quit:tDone>=pCount
   }
-  &sql(CLOSE DiseaseRegistryDeleteDiagnoses)
+  &sql(CLOSE DemoDeleteDiagnoses)
   Quit tSC
 }
 
 ClassMethod BuildAll() As %Status
 {
-  Write !,"Building DiseaseRegistryPatients...",!
-  Set tSC = ##class(%DeepSee.Utils).%BuildCube("DiseaseRegistryPatients",0,1)
+  Write !,"Building DemoPatients...",!
+  Set tSC = ##class(%DeepSee.Utils).%BuildCube("DemoPatients",0,1)
   If $$$ISERR(tSC) Quit tSC
-  Write !,"Building DiseaseRegistryDiagnoses...",!
-  Quit ##class(%DeepSee.Utils).%BuildCube("DiseaseRegistryDiagnoses",0,1)
+  Write !,"Building DemoDiagnoses...",!
+  Quit ##class(%DeepSee.Utils).%BuildCube("DemoDiagnoses",0,1)
 }
 
 ClassMethod SynchronizeAll(pWarm As %Boolean = 1) As %Status
 {
-  Write !,"Synchronizing DiseaseRegistryPatients...",!
-  Set tSC = ##class(%DeepSee.Utils).%SynchronizeCube("DiseaseRegistryPatients",1,.tPatientFacts)
+  Write !,"Synchronizing DemoPatients...",!
+  Set tSC = ##class(%DeepSee.Utils).%SynchronizeCube("DemoPatients",1,.tPatientFacts)
   If $$$ISERR(tSC) Quit tSC
-  Write !,"Synchronizing DiseaseRegistryDiagnoses...",!
-  Set tSC = ##class(%DeepSee.Utils).%SynchronizeCube("DiseaseRegistryDiagnoses",1,.tDiagnosisFacts)
+  Write !,"Synchronizing DemoDiagnoses...",!
+  Set tSC = ##class(%DeepSee.Utils).%SynchronizeCube("DemoDiagnoses",1,.tDiagnosisFacts)
   If $$$ISERR(tSC) Quit tSC
   Write !,"Updated facts: patients=",tPatientFacts,", diagnoses=",tDiagnosisFacts,!
   If pWarm Set tSC = ..WarmAll()
@@ -257,19 +257,19 @@ ClassMethod SynchronizeAll(pWarm As %Boolean = 1) As %Status
 
 ClassMethod CreateDemoPivots() As %Status
 {
-  Set tMDX = "SELECT {[Measures].[%Count]} ON 0, NON EMPTY [Registry Status].[Registry Status].Members ON 1 FROM [DiseaseRegistryPatients]"
-  Set tSC = ..SaveManualPivot("Disease Registry/Patients by Status.pivot","DiseaseRegistryPatients",tMDX)
+  Set tMDX = "SELECT {[Measures].[%Count]} ON 0, NON EMPTY [Registry Status].[Registry Status].Members ON 1 FROM [DemoPatients]"
+  Set tSC = ..SaveManualPivot("Cube Cache Warmer Demo/Patients by Status.pivot","DemoPatients",tMDX)
   If $$$ISERR(tSC) Quit tSC
-  Set tMDX = "SELECT {[Measures].[%Count],[Measures].[Notifiable Cases]} ON 0, NON EMPTY [Disease].[Disease Group].Members ON 1 FROM [DiseaseRegistryDiagnoses]"
-  Quit ..SaveManualPivot("Disease Registry/Diagnoses by Group.pivot","DiseaseRegistryDiagnoses",tMDX)
+  Set tMDX = "SELECT {[Measures].[%Count],[Measures].[Notifiable Cases]} ON 0, NON EMPTY [Disease].[Disease Group].Members ON 1 FROM [DemoDiagnoses]"
+  Quit ..SaveManualPivot("Cube Cache Warmer Demo/Diagnoses by Group.pivot","DemoDiagnoses",tMDX)
 }
 
 /// Create a pivot dashboard whose initial query uses both a runtime default and
 /// a static default. This provides a deployable example for dashboard-aware warming.
 ClassMethod CreateDemoDashboard() As %Status
 {
-  Set tFullName = "Disease Registry/Patient Overview.dashboard"
-  Set tSC = ##class(%DeepSee.UserPortal.Utils).%SetUserSetting("DiseaseRegistryDefaultStatus","""&[Active]""","Default registry status used by the cache-warmer demo","DefaultFilterValue")
+  Set tFullName = "Cube Cache Warmer Demo/Patient Overview.dashboard"
+  Set tSC = ##class(%DeepSee.UserPortal.Utils).%SetUserSetting("DemoDefaultStatus","""&[Active]""","Default registry status used by the cache-warmer demo","DefaultFilterValue")
   If $$$ISERR(tSC) Quit tSC
 
   If ##class(%DeepSee.UserLibrary.Utils).%FolderItemExists(tFullName) {
@@ -289,7 +289,7 @@ ClassMethod CreateDemoDashboard() As %Status
   Set tWidget.name = "PatientStatus"
   Set tWidget.type = "pivot"
   Set tWidget.title = "Patients by Status"
-  Set tWidget.dataSource = "Disease Registry/Patients by Status.pivot"
+  Set tWidget.dataSource = "Cube Cache Warmer Demo/Patients by Status.pivot"
   Set tWidget.top = 10
   Set tWidget.left = 10
   Set tWidget.width = 800
@@ -302,7 +302,7 @@ ClassMethod CreateDemoDashboard() As %Status
   Set tControl.location = "widget"
   Set tControl.type = "searchBox"
   Set tControl.label = "Registry Status"
-  Set tControl.value = "@DiseaseRegistryDefaultStatus"
+  Set tControl.value = "@DemoDefaultStatus"
   Do tWidget.controls.Insert(tControl)
 
   Set tControl = ##class(%DeepSee.Dashboard.Control).%New()
@@ -340,9 +340,9 @@ ClassMethod SaveManualPivot(pFullName As %String, pCubeName As %String, pMDX As 
 
 ClassMethod WarmAll() As %Status
 {
-  Set tSC = ##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmCube("DiseaseRegistryPatients",0,1,.tPatientStats)
+  Set tSC = ##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmCube("DemoPatients",0,1,.tPatientStats)
   If $$$ISERR(tSC) Quit tSC
-  Set tSC = ##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmCube("DiseaseRegistryDiagnoses",0,1,.tDiagnosisStats)
+  Set tSC = ##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmCube("DemoDiagnoses",0,1,.tDiagnosisStats)
   If $$$ISERR(tSC) Quit tSC
   Write !,"Warmed ",tPatientStats("succeeded")+tDiagnosisStats("succeeded")," saved queries.",!
   Quit $$$OK
@@ -350,9 +350,9 @@ ClassMethod WarmAll() As %Status
 
 ClassMethod ShowCounts() As %Status
 {
-  &sql(SELECT COUNT(*) INTO :tPatients FROM DiseaseRegistry_Model.Patient)
+  &sql(SELECT COUNT(*) INTO :tPatients FROM Demo_Model.Patient)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to count patients. SQLCODE="_SQLCODE)
-  &sql(SELECT COUNT(*) INTO :tDiagnoses FROM DiseaseRegistry_Model.Diagnosis)
+  &sql(SELECT COUNT(*) INTO :tDiagnoses FROM Demo_Model.Diagnosis)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to count diagnoses. SQLCODE="_SQLCODE)
   Write !,"Source rows: ",tPatients," patients; ",tDiagnoses," diagnoses.",!
   Quit $$$OK

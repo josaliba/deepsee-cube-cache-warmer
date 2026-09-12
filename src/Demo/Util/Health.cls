@@ -1,4 +1,4 @@
-Class DiseaseRegistry.Util.Health
+Class Demo.Util.Health
 {
 
 ClassMethod Ping() As %String

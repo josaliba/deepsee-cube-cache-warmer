@@ -1,12 +1,12 @@
-Class DiseaseRegistry.Cube.Patient Extends %DeepSee.CubeDefinition [ DependsOn = DiseaseRegistry.Model.Patient ]
+Class Demo.Cube.Patient Extends %DeepSee.CubeDefinition [ DependsOn = Demo.Model.Patient ]
 {
 
 XData Cube [ XMLNamespace = "http://www.intersystems.com/deepsee" ]
 {
-<cube name="DiseaseRegistryPatients"
-      caption="Disease Registry Patients"
+<cube name="DemoPatients"
+      caption="Cube Cache Warmer Demo Patients"
       owner="_SYSTEM"
-      sourceClass="DiseaseRegistry.Model.Patient">
+      sourceClass="Demo.Model.Patient">
 
   <dimension name="Registry Status" hasAll="true" allCaption="All Registry Statuses">
     <hierarchy name="H1">

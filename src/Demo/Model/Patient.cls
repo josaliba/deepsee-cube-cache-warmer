@@ -1,4 +1,4 @@
-Class DiseaseRegistry.Model.Patient Extends (%Persistent, %JSON.Adaptor)
+Class Demo.Model.Patient Extends (%Persistent, %JSON.Adaptor)
 {
 
 /// Track inserts, updates, and deletes for incremental BI cube synchronization.

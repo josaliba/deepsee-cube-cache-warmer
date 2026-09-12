@@ -1,7 +1,7 @@
 # Operations, monitoring, and troubleshooting
 
 Run SQL in the same Analytics namespace where the package is installed. For the
-demo, use `DISEASEREGISTRY`.
+demo, use `CCWDEMO`.
 
 ## Run modes
 
@@ -268,7 +268,7 @@ Schedule retention according to operational, audit, and storage requirements.
 First-time bootstrap is asynchronous. Follow `./bin/logs` and wait for:
 
 ```text
-Disease Registry bootstrap complete.
+Cube Cache Warmer Demo bootstrap complete.
 ```
 
 If bootstrap failed, inspect the status immediately before that point. Confirm
