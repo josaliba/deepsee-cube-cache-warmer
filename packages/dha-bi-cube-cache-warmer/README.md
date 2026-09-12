@@ -38,8 +38,10 @@ src/dha/bi/CubeCacheWarmer/
     └── QueryUsage.cls
 ```
 
-The entire `dha-bi-cube-cache-warmer` directory can be copied into another
-repository or archived for distribution.
+The IPM `module.xml` for this package lives at the repository root so the
+repository itself is IPM-loadable. Run `./bin/package-cache-warmer` from the
+repository root to produce a self-contained archive of this directory with its
+own `module.xml` and license for distribution.
 
 ### Upgrading from the uppercase package name
 
@@ -52,10 +54,11 @@ before using either installation method below.
 
 ## Install with InterSystems Package Manager
 
-With an IPM client installed, run this from the target Analytics namespace:
+With an IPM client installed, run this from the target Analytics namespace,
+pointing at either the cloned repository root or an extracted package archive:
 
 ```objectscript
-zpm "load /path/to/dha-bi-cube-cache-warmer"
+zpm "load /path/to/deepsee-cube-cache-warmer"
 ```
 
 The module installs both the dashboard-access and query-execution audit hooks.
@@ -186,5 +189,5 @@ or execution history.
   security context.
 - URL filters, interactive selections, and per-user overrides cannot be
   predicted automatically.
-- Review and add the license required by your organization before external
-  redistribution.
+- The package is released under the MIT License; see `LICENSE` at the
+  repository root or in the distributed archive.

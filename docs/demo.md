@@ -29,14 +29,15 @@ cubes without rebuilding every fact.
 
 - Docker Desktop with Docker Compose v2
 - Git
-- Network access to the InterSystems Container Registry
+- Network access to the InterSystems Container Registry and to
+  `pm.community.intersystems.com` for the IPM installer
 - Permission to pull the configured IRIS Community and Web Gateway images
 - Optional: Visual Studio Code with the extensions recommended by the repository
 
 ## Clone and configure
 
 ```bash
-git clone git@gitlab.iscinternal.com:jsaliba/deepsee-cube-cache-warmer.git
+git clone https://github.com/josaliba/deepsee-cube-cache-warmer.git
 cd deepsee-cube-cache-warmer
 ```
 
@@ -88,10 +89,13 @@ Bootstrap performs the following work:
 1. Creates durable IRIS system storage.
 2. Creates the `DISEASEREGISTRY` database and namespace.
 3. Enables the namespace for interoperability and Analytics.
-4. Imports and compiles `dha.bi.CubeCacheWarmer`.
-5. Imports and compiles the demo application.
-6. Activates `DiseaseRegistry.CubeRegistry` and updater tasks.
-7. Installs the dashboard-open and normalized-query-frequency audit hooks.
+4. Installs InterSystems Package Manager (IPM) if the durable volume predates
+   the image that ships it.
+5. Loads `dha.bi.CubeCacheWarmer` from the root `module.xml` with IPM, whose
+   Activate hook installs the dashboard-open and normalized-query-frequency
+   audit hooks.
+6. Imports and compiles the demo application.
+7. Activates `DiseaseRegistry.CubeRegistry` and updater tasks.
 
 ## Open the development environment
 

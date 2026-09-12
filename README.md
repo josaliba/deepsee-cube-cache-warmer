@@ -8,10 +8,32 @@ repopulate its normal result cache before users open the dashboards.
 This repository contains both:
 
 - a standalone, application-neutral cache-warmer package under
-  [`packages/dha-bi-cube-cache-warmer`](packages/dha-bi-cube-cache-warmer/README.md);
-  and
+  [`packages/dha-bi-cube-cache-warmer`](packages/dha-bi-cube-cache-warmer/README.md),
+  described by the IPM [`module.xml`](module.xml) at the repository root; and
 - a complete Docker Compose disease-registry demo with two synchronized cubes,
   saved pivots, a dashboard with default filters, tests, and operational helpers.
+
+Source and issues: <https://github.com/josaliba/deepsee-cube-cache-warmer>. Licensed under the [MIT License](LICENSE).
+
+## Install the package with IPM
+
+Clone the repository and load it from an ObjectScript terminal connected to
+the target Analytics namespace:
+
+```objectscript
+zpm "load /path/to/deepsee-cube-cache-warmer"
+```
+
+Then set each cube's Cube Manager Post-Build and Post-Synchronize code to:
+
+```objectscript
+do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
+```
+
+Once the module is published to the InterSystems community package registry,
+`zpm "install dha.bi.CubeCacheWarmer"` installs it directly. See
+[deployment.md](docs/deployment.md) for source-based installation, upgrade,
+verification, and uninstall.
 
 ## How it works
 
@@ -123,7 +145,9 @@ that upgrade path on IRIS 2026.1.
 ## Repository layout
 
 ```text
-packages/dha-bi-cube-cache-warmer/  Standalone package, tests, and module.xml
+module.xml                          IPM module definition for the standalone package
+LICENSE                             MIT License
+packages/dha-bi-cube-cache-warmer/  Standalone package sources and unit tests
 src/DiseaseRegistry/                Demo models, cubes, registry, and helpers
 tests/DiseaseRegistry/              Demo smoke and cube-registry tests
 docker/                             Fresh-volume bootstrap and installer
@@ -137,12 +161,14 @@ docs/                               Demo, architecture, deployment, and operatio
 
 - Docker Desktop with Docker Compose v2
 - Git
-- Network access to `containers.intersystems.com`
+- Network access to `containers.intersystems.com` and
+  `pm.community.intersystems.com` (the image build installs IPM from the
+  community registry and loads the cache warmer through it)
 
 Clone the repository and enter it:
 
 ```bash
-git clone git@gitlab.iscinternal.com:jsaliba/deepsee-cube-cache-warmer.git
+git clone https://github.com/josaliba/deepsee-cube-cache-warmer.git
 cd deepsee-cube-cache-warmer
 ```
 
@@ -205,13 +231,15 @@ for an isolated development workstation.
 
 ## Build the distributable package
 
-Create a versioned archive from the version in `module.xml`:
+Create a versioned archive from the version in the root `module.xml`:
 
 ```bash
 ./bin/package-cache-warmer
 ```
 
-The script writes an ignored archive such as:
+The archive contains the package sources, tests, the license, and a
+`module.xml` rewritten so the extracted directory loads on its own. The script
+writes an ignored archive such as:
 
 ```text
 dist/dha-bi-cube-cache-warmer-1.2.0.tar.gz
@@ -250,6 +278,8 @@ licensing, auditing, backups, data retention, resource limits, and applicable
 healthcare privacy requirements. Cache warming consumes CPU and I/O; deploy a
 deliberate workload rather than attempting to warm every possible user filter.
 
-No external redistribution license is included in this repository. Add or
-confirm the license required by your organization before publishing the package
-outside its intended environment.
+## License
+
+This project is released under the [MIT License](LICENSE). The demo runs on
+InterSystems IRIS Community Edition, which carries its own license terms; review
+the target IRIS licensing before deploying the package elsewhere.

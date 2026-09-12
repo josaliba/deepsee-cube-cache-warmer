@@ -7,7 +7,7 @@ XData Setup
 {
 <Manifest>
   <Default Name="SourceDir" Value="/workspace/src"/>
-  <Default Name="CacheWarmerSourceDir" Value="/workspace/packages/dha-bi-cube-cache-warmer/src"/>
+  <Default Name="CacheWarmerModuleDir" Value="/workspace/"/>
   <Default Name="Namespace" Value="DISEASEREGISTRY"/>
   <Default Name="DatabaseDir" Value="/durable/databases/DISEASEREGISTRY"/>
   <Namespace Name="${Namespace}" Code="${Namespace}" Data="${Namespace}" Create="yes" Ensemble="1">
@@ -38,6 +38,11 @@ ClassMethod Bootstrap() As %Status
     If $SYSTEM.Status.IsError(sc) Quit sc
   }
 
+  // The image build installs IPM into IRISSYS. A durable volume created from an
+  // older image predates that, so install IPM at runtime when it is missing.
+  Set sc = ..EnsureIPM()
+  If $SYSTEM.Status.IsError(sc) Quit sc
+
   Set previousNamespace = $Namespace
   Set $Namespace = "DISEASEREGISTRY"
   Set sc = ..MigrateCacheWarmerPackageCase()
@@ -45,10 +50,13 @@ ClassMethod Bootstrap() As %Status
     Set $Namespace = previousNamespace
     Quit sc
   }
-  // Restrict recursive imports to ObjectScript classes. This prevents host
-  // metadata such as macOS .DS_Store files from making bootstrap fail.
-  Set sc = $SYSTEM.OBJ.Import("/workspace/packages/dha-bi-cube-cache-warmer/src", "ck/recurse=1/extensions=cls")
+  // Load the cache warmer through its module.xml with IPM, exactly as an end
+  // user would, so the demo exercises the published module definition. The
+  // module's Activate hook installs both audit commands.
+  Set sc = ..LoadCacheWarmerModule("/workspace/")
   If '$SYSTEM.Status.IsError(sc) {
+    // Restrict recursive imports to ObjectScript classes. This prevents host
+    // metadata such as macOS .DS_Store files from making bootstrap fail.
     Set sc = $SYSTEM.OBJ.Import("/workspace/src", "ck/recurse=1/extensions=cls")
   }
   If '$SYSTEM.Status.IsError(sc) {
@@ -57,12 +65,51 @@ ClassMethod Bootstrap() As %Status
   If '$SYSTEM.Status.IsError(sc) {
     Set sc = ##class(%DeepSee.CubeManager.Utils).ScheduleUpdaterTasks()
   }
-  If '$SYSTEM.Status.IsError(sc) {
-    Set sc = ##class(dha.bi.CubeCacheWarmer.Installer).Install()
-  }
   Set $Namespace = previousNamespace
 
   Quit sc
+}
+
+/// Install InterSystems Package Manager (IPM) from the community registry when
+/// it is not already present. Must run in %SYS.
+ClassMethod EnsureIPM() As %Status
+{
+  If ##class(%Dictionary.CompiledClass).%ExistsId("%IPM.Main") Quit $$$OK
+
+  Write "Installing InterSystems Package Manager (IPM)...",!
+  Set request = ##class(%Net.HttpRequest).%New()
+  Set request.Server = "pm.community.intersystems.com"
+  Set request.Https = 1
+  Set request.SSLConfiguration = "ISC.FeatureTracker.SSL.Config"
+  Set sc = request.Get("/packages/ipm/latest/installer")
+  If $SYSTEM.Status.IsError(sc) Quit sc
+  If request.HttpResponse.StatusCode '= 200 {
+    Quit $$$ERROR($$$GeneralError, "IPM installer download failed with HTTP status "_request.HttpResponse.StatusCode)
+  }
+  // Compiling the installer class runs its projection, which installs IPM.
+  Set sc = $SYSTEM.OBJ.LoadStream(request.HttpResponse.Data, "ck")
+  If $SYSTEM.Status.IsError(sc) Quit sc
+  If '##class(%Dictionary.CompiledClass).%ExistsId("%IPM.Main") {
+    Quit $$$ERROR($$$GeneralError, "IPM installer completed but %IPM.Main is not available")
+  }
+  Quit $$$OK
+}
+
+/// Load (or reload) the cache-warmer module from its module.xml directory into
+/// the current namespace with IPM. IPM classes are resolved at runtime so this
+/// class still compiles on an instance without IPM.
+ClassMethod LoadCacheWarmerModule(pModuleDirectory As %String) As %Status
+{
+  If '##class(%Dictionary.CompiledClass).%ExistsId("%IPM.Utils.Module") {
+    Quit $$$ERROR($$$GeneralError, "IPM is not installed; cannot load module from "_pModuleDirectory)
+  }
+  Set params("Verbose") = 1
+  Set sc = $CLASSMETHOD("%IPM.Utils.Module", "LoadNewModule", pModuleDirectory, .params)
+  If $SYSTEM.Status.IsError(sc) Quit sc
+  If '##class(%Dictionary.CompiledClass).%ExistsId("dha.bi.CubeCacheWarmer.CacheWarmer") {
+    Quit $$$ERROR($$$GeneralError, "IPM load finished but dha.bi.CubeCacheWarmer.CacheWarmer is not compiled")
+  }
+  Quit $$$OK
 }
 
 /// IRIS class names are case-insensitive but retain canonical case. Remove only

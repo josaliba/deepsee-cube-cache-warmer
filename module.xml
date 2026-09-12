@@ -5,9 +5,17 @@
       <Name>dha.bi.CubeCacheWarmer</Name>
       <Description>True query-frequency-ordered cache warming for InterSystems IRIS Business Intelligence cubes and dashboards.</Description>
       <Version>1.2.0</Version>
+      <Keywords>analytics,bi,deepsee,cube,cache,dashboard,mdx,cube manager</Keywords>
+      <Author>
+        <Person>Joseph Saliba</Person>
+        <CopyrightDate>2026</CopyrightDate>
+        <License>MIT</License>
+        <Notes>https://github.com/josaliba/deepsee-cube-cache-warmer</Notes>
+      </Author>
       <Packaging>module</Packaging>
-      <SourcesRoot>src</SourcesRoot>
+      <SourcesRoot>packages/dha-bi-cube-cache-warmer/src</SourcesRoot>
       <Resource Name="dha.bi.CubeCacheWarmer.PKG"/>
+      <UnitTest Name="/packages/dha-bi-cube-cache-warmer/tests/" Package="dha.bi.CubeCacheWarmer.Test" Phase="test"/>
       <SystemRequirements Version=">=2021.1"/>
       <Invoke Class="dha.bi.CubeCacheWarmer.Installer" Method="Install" Phase="Activate" When="After"/>
       <Invoke Class="dha.bi.CubeCacheWarmer.Installer" Method="Uninstall" Phase="Clean" When="Before"/>

@@ -40,6 +40,7 @@ services:
       - "${IRIS_SUPERSERVER_PORT:-1972}:1972"
     volumes:
       - iris-data:/durable
+      - ./module.xml:/workspace/module.xml:ro
       - ./src:/workspace/src:ro
       - ./tests:/workspace/tests:ro
       - ./packages:/workspace/packages:ro

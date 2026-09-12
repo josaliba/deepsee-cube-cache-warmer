@@ -1,8 +1,9 @@
 # Deploy the standalone package
 
-The deployable unit is `packages/dha-bi-cube-cache-warmer`. It has no dependency
-on the Disease Registry demo, Docker, application cube names, namespace names,
-or the demo's Cube Manager registry.
+The deployable unit is `packages/dha-bi-cube-cache-warmer`, described by the
+IPM `module.xml` at the repository root. It has no dependency on the Disease
+Registry demo, Docker, application cube names, namespace names, or the demo's
+Cube Manager registry.
 
 ## Requirements
 
@@ -30,7 +31,7 @@ From the repository root:
 ./bin/package-cache-warmer
 ```
 
-The script reads the version from `module.xml` and writes:
+The script reads the version from the root `module.xml` and writes:
 
 ```text
 dist/dha-bi-cube-cache-warmer-<version>.tar.gz
@@ -39,27 +40,40 @@ dist/dha-bi-cube-cache-warmer-<version>.tar.gz
 The archive contains the standalone package directory, including:
 
 ```text
+LICENSE
 README.md
 module.xml
 src/dha/bi/CubeCacheWarmer/
 tests/dha/bi/CubeCacheWarmer/Test/
 ```
 
+The archived `module.xml` is generated from the root one with its
+repository-relative paths rewritten, so the extracted directory is loadable on
+its own.
+
 Generated archives are ignored by Git. Publish them through the organization's
 approved artifact mechanism rather than committing binaries to the repository.
 
-Before a release, update the `<Version>` in `module.xml`, run the tests, build
+Before a release, update the `<Version>` in the root `module.xml`, run the
+tests, build
 the archive, inspect its contents, and tag the corresponding commit according to
 the team's release policy.
 
 ## Install with InterSystems Package Manager
 
-Extract or copy the package directory to a path visible from the target IRIS
-instance. In an ObjectScript terminal connected to the target Analytics
-namespace:
+Clone the repository, or extract the package archive, to a path visible from
+the target IRIS instance. In an ObjectScript terminal connected to the target
+Analytics namespace, load whichever directory contains `module.xml`:
 
 ```objectscript
-zpm "load /path/to/dha-bi-cube-cache-warmer"
+zpm "load /path/to/deepsee-cube-cache-warmer"
+```
+
+Once the module is published to the community package registry, it can be
+installed without a local copy:
+
+```objectscript
+zpm "install dha.bi.CubeCacheWarmer"
 ```
 
 The IPM module:
@@ -77,7 +91,7 @@ An existing audit command is preserved and runs after the recorder.
 When IPM is unavailable, import the source directory and invoke the installer:
 
 ```objectscript
-set sc=$SYSTEM.OBJ.LoadDir("/path/to/dha-bi-cube-cache-warmer/src","ck",,1)
+set sc=$SYSTEM.OBJ.LoadDir("/path/to/deepsee-cube-cache-warmer/packages/dha-bi-cube-cache-warmer/src","ck",,1)
 do $SYSTEM.OBJ.DisplayError(sc)
 quit:$SYSTEM.Status.IsError(sc)
 
@@ -246,7 +260,7 @@ For an IPM installation, deploy the updated directory or artifact and load it in
 the same namespace:
 
 ```objectscript
-zpm "load /path/to/dha-bi-cube-cache-warmer"
+zpm "load /path/to/deepsee-cube-cache-warmer"
 ```
 
 For a source installation, import the new `src` directory with compile flags and
@@ -285,8 +299,7 @@ usage and run history are not automatically deleted. Retain or remove those
 records according to the organization's data-retention policy before removing
 their model classes.
 
-## Redistribution
+## License
 
-No external redistribution license is included. Confirm the organization's
-license requirements and the target IRIS licensing terms before publishing the
-package or its archive outside the intended environment.
+The package is released under the MIT License (see `LICENSE`). Confirm the
+target IRIS licensing terms before deploying the package or its archive.
