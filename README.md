@@ -242,7 +242,7 @@ The archive contains the package sources, tests, the license, and a
 writes an ignored archive such as:
 
 ```text
-dist/iris-bi-cube-cache-warmer-2.0.0.tar.gz
+dist/iris-bi-cube-cache-warmer-1.0.0.tar.gz
 ```
 
 See [deployment.md](docs/deployment.md) for IPM installation, source-based
