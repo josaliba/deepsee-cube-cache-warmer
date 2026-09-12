@@ -1,14 +1,14 @@
 # DeepSee Cube Cache Warmer
 
 True query-frequency-aware cache warming for InterSystems IRIS Business Intelligence
-(formerly DeepSee). The reusable `dha.bi.CubeCacheWarmer` package executes saved
+(formerly DeepSee). The reusable `dc.bi.CubeCacheWarmer` package executes saved
 dashboard and pivot queries after cube builds or synchronizations so IRIS can
 repopulate its normal result cache before users open the dashboards.
 
 This repository contains both:
 
 - a standalone, application-neutral cache-warmer package under
-  [`packages/dha-bi-cube-cache-warmer`](packages/dha-bi-cube-cache-warmer/README.md),
+  [`packages/cube-cache-warmer`](packages/cube-cache-warmer/README.md),
   described by the IPM [`module.xml`](module.xml) at the repository root; and
 - a complete Docker Compose disease-registry demo with two synchronized cubes,
   saved pivots, a dashboard with default filters, tests, and operational helpers.
@@ -27,11 +27,11 @@ zpm "load /path/to/deepsee-cube-cache-warmer"
 Then set each cube's Cube Manager Post-Build and Post-Synchronize code to:
 
 ```objectscript
-do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
+do ##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
 ```
 
 Once the module is published to the InterSystems community package registry,
-`zpm "install dha.bi.CubeCacheWarmer"` installs it directly. See
+`zpm "install iris-bi-cube-cache-warmer"` installs it directly. See
 [deployment.md](docs/deployment.md) for source-based installation, upgrade,
 verification, and uninstall.
 
@@ -81,7 +81,7 @@ flowchart TD
    warmer:
 
    ```objectscript
-   do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
+   do ##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
    ```
 
    Requests for the same cube are coalesced so concurrent hooks do not start
@@ -106,10 +106,10 @@ flowchart TD
    success or failure, row and column counts, real query frequency, actual
    execution order, dashboard attribution, and query type:
 
-   - `dha_bi_CubeCacheWarmer_Model.CacheWarmRun`
-   - `dha_bi_CubeCacheWarmer_Model.CacheWarmQuery`
-   - `dha_bi_CubeCacheWarmer_Model.DashboardUsage`
-   - `dha_bi_CubeCacheWarmer_Model.QueryUsage`
+   - `dc_bi_CubeCacheWarmer_Model.CacheWarmRun`
+   - `dc_bi_CubeCacheWarmer_Model.CacheWarmQuery`
+   - `dc_bi_CubeCacheWarmer_Model.DashboardUsage`
+   - `dc_bi_CubeCacheWarmer_Model.QueryUsage`
 
 See [Architecture and execution flow](docs/architecture.md) for the detailed
 behavior of each path, including concurrency, dashboard ranking, and outcomes.
@@ -147,7 +147,7 @@ that upgrade path on IRIS 2026.1.
 ```text
 module.xml                          IPM module definition for the standalone package
 LICENSE                             MIT License
-packages/dha-bi-cube-cache-warmer/  Standalone package sources and unit tests
+packages/cube-cache-warmer/  Standalone package sources and unit tests
 src/DiseaseRegistry/                Demo models, cubes, registry, and helpers
 tests/DiseaseRegistry/              Demo smoke and cube-registry tests
 docker/                             Fresh-volume bootstrap and installer
@@ -227,7 +227,7 @@ for an isolated development workstation.
 - [Architecture and execution flow](docs/architecture.md)
 - [Deploy and upgrade the standalone package](docs/deployment.md)
 - [Operate, monitor, and troubleshoot the warmer](docs/operations.md)
-- [Standalone package reference](packages/dha-bi-cube-cache-warmer/README.md)
+- [Standalone package reference](packages/cube-cache-warmer/README.md)
 
 ## Build the distributable package
 
@@ -242,7 +242,7 @@ The archive contains the package sources, tests, the license, and a
 writes an ignored archive such as:
 
 ```text
-dist/dha-bi-cube-cache-warmer-1.2.0.tar.gz
+dist/iris-bi-cube-cache-warmer-2.0.0.tar.gz
 ```
 
 See [deployment.md](docs/deployment.md) for IPM installation, source-based

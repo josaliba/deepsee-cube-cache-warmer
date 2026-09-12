@@ -2,27 +2,14 @@ Include %occStatus
 
 /// Counts real IRIS BI query executions through ^DeepSee.AuditQueryCode.
 /// Cache-warmer executions are marked process-locally and are never counted.
-Class dha.bi.CubeCacheWarmer.QueryUsage Extends %RegisteredObject
+Class dc.bi.CubeCacheWarmer.QueryUsage Extends %RegisteredObject
 {
 
-Parameter AUDITCOMMAND = "do ##class(dha.bi.CubeCacheWarmer.QueryUsage).RecordAudit()";
-
-Parameter LEGACYAUDITCOMMAND = "do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).RecordAudit()";
-
-Parameter LEGACYAUDITCOMMAND2 = "do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).Record(%dsQuery)";
-
-Parameter LEGACYAUDITCOMMAND3 = "do ##class(DHA.BI.CubeCacheWarmer.QueryUsage).RecordQuery(pQuery,$get(%dsQuery))";
+Parameter AUDITCOMMAND = "do ##class(dc.bi.CubeCacheWarmer.QueryUsage).RecordAudit()";
 
 ClassMethod Install(Output pChanged As %Boolean = 0) As %Status
 {
   Set pChanged = 0
-  Set tRemoveSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND,.tLegacyChanged)
-  If $$$ISERR(tRemoveSC) Quit tRemoveSC
-  Set tRemoveSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND2,.tLegacy2Changed)
-  If $$$ISERR(tRemoveSC) Quit tRemoveSC
-  Set tRemoveSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND3,.tLegacy3Changed)
-  If $$$ISERR(tRemoveSC) Quit tRemoveSC
-  Set pChanged = tLegacyChanged||tLegacy2Changed||tLegacy3Changed
   Set tCommand = ..#AUDITCOMMAND
   Set tCurrent = $Get(^DeepSee.AuditQueryCode)
   If tCurrent[tCommand {
@@ -37,15 +24,7 @@ ClassMethod Install(Output pChanged As %Boolean = 0) As %Status
 
 ClassMethod Uninstall(Output pChanged As %Boolean = 0) As %Status
 {
-  Set tSC = ..RemoveCommand(..#AUDITCOMMAND,.tCurrentChanged)
-  If $$$ISERR(tSC) Quit tSC
-  Set tSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND,.tLegacyChanged)
-  If $$$ISERR(tSC) Quit tSC
-  Set tSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND2,.tLegacy2Changed)
-  If $$$ISERR(tSC) Quit tSC
-  Set tSC = ..RemoveCommand(..#LEGACYAUDITCOMMAND3,.tLegacy3Changed)
-  Set pChanged = tCurrentChanged||tLegacyChanged||tLegacy2Changed||tLegacy3Changed
-  Quit tSC
+  Quit ..RemoveCommand(..#AUDITCOMMAND,.pChanged)
 }
 
 ClassMethod RemoveCommand(pCommand As %String, Output pChanged As %Boolean = 0) As %Status [ Private ]
@@ -68,7 +47,7 @@ ClassMethod RemoveCommand(pCommand As %String, Output pChanged As %Boolean = 0) 
 /// Public convenience entry point for importing or explicitly recording MDX.
 ClassMethod Record(pMDX As %String)
 {
-  Quit:$Get(^||DHABICCW.CacheWarmer("active"))>0
+  Quit:$Get(^||dc.bi.CCW.CacheWarmer("active"))>0
   Do ..RecordInternal(pMDX)
 }
 
@@ -76,7 +55,7 @@ ClassMethod Record(pMDX As %String)
 /// some supported IRIS versions do not define %dsQuery for direct API calls.
 ClassMethod RecordAudit()
 {
-  Do ..CaptureNewQueryLogEntries($Get(^||DHABICCW.CacheWarmer("active"))<1)
+  Do ..CaptureNewQueryLogEntries($Get(^||dc.bi.CCW.CacheWarmer("active"))<1)
 }
 
 /// Import the current contents of ^DeepSee.QueryLog once when historical
@@ -85,7 +64,7 @@ ClassMethod ImportQueryLog(pReset As %Boolean = 0, Output pImported As %Integer 
 {
   Set pImported = 0
   If pReset {
-    Set tSC = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%DeleteExtent()
+    Set tSC = ##class(dc.bi.CubeCacheWarmer.Model.QueryUsage).%DeleteExtent()
     If $$$ISERR(tSC) Quit tSC
   }
 
@@ -101,7 +80,7 @@ ClassMethod ImportQueryLog(pReset As %Boolean = 0, Output pImported As %Integer 
       Continue:tMDX=""
       If ..RecordInternal(tMDX) Set pImported = pImported+1
     }
-    Set ^DHABICCW.QueryLogCheckpoint(tUser) = $Order(^DeepSee.QueryLog(tUser,""),-1)
+    Set ^dc.bi.CCW.QueryLogCheckpoint(tUser) = $Order(^DeepSee.QueryLog(tUser,""),-1)
   }
   Quit $$$OK
 }
@@ -136,14 +115,14 @@ ClassMethod RecordKnownQuery(pQueryKey As %String, pCubeName As %String, pMDX As
   Try {
     // The lock is intentionally blocking and very short. Unlike dashboard-open
     // telemetry, query frequency must not silently lose simultaneous executions.
-    Lock +^DHABICCW.QueryUsageLock(pQueryKey)
+    Lock +^dc.bi.CCW.QueryUsageLock(pQueryKey)
     Set tLockHeld = 1
     Set tNow = ..CurrentTimestamp()
-    If ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%ExistsId(pQueryKey) {
-      Set tUsage = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%OpenId(pQueryKey,,.tOpenSC)
+    If ##class(dc.bi.CubeCacheWarmer.Model.QueryUsage).%ExistsId(pQueryKey) {
+      Set tUsage = ##class(dc.bi.CubeCacheWarmer.Model.QueryUsage).%OpenId(pQueryKey,,.tOpenSC)
     } Else {
       Set tOpenSC = $$$OK
-      Set tUsage = ##class(dha.bi.CubeCacheWarmer.Model.QueryUsage).%New()
+      Set tUsage = ##class(dc.bi.CubeCacheWarmer.Model.QueryUsage).%New()
       Set tUsage.QueryKey = pQueryKey
       Set tUsage.ExecutionCount = 0
       Set tUsage.FirstExecutedAt = tNow
@@ -159,7 +138,7 @@ ClassMethod RecordKnownQuery(pQueryKey As %String, pCubeName As %String, pMDX As
   } Catch ex {
     Set tRecorded = 0
   }
-  If tLockHeld Lock -^DHABICCW.QueryUsageLock(pQueryKey)
+  If tLockHeld Lock -^dc.bi.CCW.QueryUsageLock(pQueryKey)
   Quit tRecorded
 }
 
@@ -167,13 +146,13 @@ ClassMethod RecordKnownQuery(pQueryKey As %String, pCubeName As %String, pMDX As
 /// A warmer audit advances the checkpoint without counting its replay.
 ClassMethod CaptureNewQueryLogEntries(pCount As %Boolean) [ Private ]
 {
-  Lock +^DHABICCW.QueryLogCaptureLock
+  Lock +^dc.bi.CCW.QueryLogCaptureLock
   Try {
     Set tUser = ""
     For {
       Set tUser = $Order(^DeepSee.QueryLog(tUser))
       Quit:tUser=""
-      Set tCheckpoint = $Get(^DHABICCW.QueryLogCheckpoint(tUser))
+      Set tCheckpoint = $Get(^dc.bi.CCW.QueryLogCheckpoint(tUser))
       Set tLast = $Order(^DeepSee.QueryLog(tUser,""),-1)
       If (tCheckpoint'=""),(tLast<tCheckpoint) Set tCheckpoint = ""
       Set tSequence = tCheckpoint
@@ -181,25 +160,25 @@ ClassMethod CaptureNewQueryLogEntries(pCount As %Boolean) [ Private ]
         Set tSequence = $Order(^DeepSee.QueryLog(tUser,tSequence))
         Quit:tSequence=""
         If pCount Do ..RecordInternal($Get(^DeepSee.QueryLog(tUser,tSequence)))
-        Set ^DHABICCW.QueryLogCheckpoint(tUser) = tSequence
+        Set ^dc.bi.CCW.QueryLogCheckpoint(tUser) = tSequence
       }
     }
   } Catch ex {
     // Query auditing must never make the user's query fail.
   }
-  Lock -^DHABICCW.QueryLogCaptureLock
+  Lock -^dc.bi.CCW.QueryLogCaptureLock
 }
 
 /// Start live counting after the existing native history. Historical data is
 /// imported only through the explicit ImportQueryLog() operation.
 ClassMethod InitializeQueryLogCheckpoints() [ Private ]
 {
-  Quit:$Data(^DHABICCW.QueryLogCheckpoint)
+  Quit:$Data(^dc.bi.CCW.QueryLogCheckpoint)
   Set tUser = ""
   For {
     Set tUser = $Order(^DeepSee.QueryLog(tUser))
     Quit:tUser=""
-    Set ^DHABICCW.QueryLogCheckpoint(tUser) = $Order(^DeepSee.QueryLog(tUser,""),-1)
+    Set ^dc.bi.CCW.QueryLogCheckpoint(tUser) = $Order(^DeepSee.QueryLog(tUser,""),-1)
   }
 }
 

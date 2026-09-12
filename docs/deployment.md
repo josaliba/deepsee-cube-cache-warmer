@@ -1,6 +1,6 @@
 # Deploy the standalone package
 
-The deployable unit is `packages/dha-bi-cube-cache-warmer`, described by the
+The deployable unit is `packages/cube-cache-warmer`, described by the
 IPM `module.xml` at the repository root. It has no dependency on the Disease
 Registry demo, Docker, application cube names, namespace names, or the demo's
 Cube Manager registry.
@@ -34,7 +34,7 @@ From the repository root:
 The script reads the version from the root `module.xml` and writes:
 
 ```text
-dist/dha-bi-cube-cache-warmer-<version>.tar.gz
+dist/cube-cache-warmer-<version>.tar.gz
 ```
 
 The archive contains the standalone package directory, including:
@@ -43,8 +43,8 @@ The archive contains the standalone package directory, including:
 LICENSE
 README.md
 module.xml
-src/dha/bi/CubeCacheWarmer/
-tests/dha/bi/CubeCacheWarmer/Test/
+src/dc/bi/CubeCacheWarmer/
+tests/dc/bi/CubeCacheWarmer/Test/
 ```
 
 The archived `module.xml` is generated from the root one with its
@@ -73,14 +73,14 @@ Once the module is published to the community package registry, it can be
 installed without a local copy:
 
 ```objectscript
-zpm "install dha.bi.CubeCacheWarmer"
+zpm "install iris-bi-cube-cache-warmer"
 ```
 
 The IPM module:
 
-1. Imports the `dha.bi.CubeCacheWarmer` package.
+1. Imports the `dc.bi.CubeCacheWarmer` package.
 2. Compiles its persistent models.
-3. Calls `dha.bi.CubeCacheWarmer.Installer.Install()`.
+3. Calls `dc.bi.CubeCacheWarmer.Installer.Install()`.
 4. Prepends the dashboard-usage recorder to `^DeepSee.AuditCode` if absent.
 5. Prepends the query-frequency recorder to `^DeepSee.AuditQueryCode` if absent.
 
@@ -91,11 +91,11 @@ An existing audit command is preserved and runs after the recorder.
 When IPM is unavailable, import the source directory and invoke the installer:
 
 ```objectscript
-set sc=$SYSTEM.OBJ.LoadDir("/path/to/deepsee-cube-cache-warmer/packages/dha-bi-cube-cache-warmer/src","ck",,1)
+set sc=$SYSTEM.OBJ.LoadDir("/path/to/deepsee-cube-cache-warmer/packages/cube-cache-warmer/src","ck",,1)
 do $SYSTEM.OBJ.DisplayError(sc)
 quit:$SYSTEM.Status.IsError(sc)
 
-set sc=##class(dha.bi.CubeCacheWarmer.Installer).Install()
+set sc=##class(dc.bi.CubeCacheWarmer.Installer).Install()
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
@@ -107,7 +107,7 @@ command.
 For each logical cube, set both Post-Build Code and Post-Synchronize Code:
 
 ```objectscript
-do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyLogicalCube")
+do ##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyLogicalCube")
 ```
 
 Using both hooks covers full builds and incremental synchronization. A build can
@@ -129,7 +129,7 @@ load the newer `%DeepSee.CubeSchedule` format.
 Confirm that the classes exist:
 
 ```objectscript
-write ##class(dha.bi.CubeCacheWarmer.CacheWarmer).%ClassName(1),!
+write ##class(dc.bi.CubeCacheWarmer.CacheWarmer).%ClassName(1),!
 ```
 
 Confirm that both audit hooks are installed:
@@ -142,14 +142,14 @@ write $get(^DeepSee.AuditQueryCode),!
 It should contain:
 
 ```objectscript
-do ##class(dha.bi.CubeCacheWarmer.DashboardUsage).Record(%dsDashboard)
-do ##class(dha.bi.CubeCacheWarmer.QueryUsage).RecordAudit()
+do ##class(dc.bi.CubeCacheWarmer.DashboardUsage).Record(%dsDashboard)
+do ##class(dc.bi.CubeCacheWarmer.QueryUsage).RecordAudit()
 ```
 
 Warm one cube synchronously during validation:
 
 ```objectscript
-set sc=##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmCube("MyLogicalCube",0,1,.stats)
+set sc=##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmCube("MyLogicalCube",0,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 zwrite stats
 ```
@@ -160,7 +160,7 @@ Then verify the run and child queries:
 SELECT TOP 5 %ID AS RunId, CubeName, Mode, Outcome,
        TotalQueries, SucceededQueries, FailedQueries,
        EnumerationErrors, ElapsedSeconds, StatusText
-FROM dha_bi_CubeCacheWarmer_Model.CacheWarmRun
+FROM dc_bi_CubeCacheWarmer_Model.CacheWarmRun
 ORDER BY %ID DESC
 ```
 
@@ -172,7 +172,7 @@ For an established namespace, optionally seed historical counts once from the
 native query log before the first production warm run:
 
 ```objectscript
-set sc=##class(dha.bi.CubeCacheWarmer.QueryUsage).ImportQueryLog(1,.imported)
+set sc=##class(dc.bi.CubeCacheWarmer.QueryUsage).ImportQueryLog(1,.imported)
 do $SYSTEM.OBJ.DisplayError(sc)
 write imported," executions imported",!
 ```
@@ -181,7 +181,7 @@ Then verify the ranking source:
 
 ```sql
 SELECT CubeName, QueryKey, ExecutionCount, FirstExecutedAt, LastExecutedAt
-FROM dha_bi_CubeCacheWarmer_Model.QueryUsage
+FROM dc_bi_CubeCacheWarmer_Model.QueryUsage
 ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey
 ```
 
@@ -222,40 +222,6 @@ warming.
 
 ## Upgrade
 
-### Upgrade from `DHA.BI` to `dha.bi`
-
-IRIS treats class names as case-insensitive while retaining the canonical case
-of the installed definition. Loading `dha.bi.CubeCacheWarmer` over an existing
-`DHA.BI.CubeCacheWarmer` definition therefore produces error `#5092` unless the
-old definitions are removed first.
-
-Back up the namespace database, then run the following in that Analytics
-namespace before loading version 1.2.0 or later:
-
-```objectscript
-set sc=##class(DHA.BI.CubeCacheWarmer.Installer).Uninstall()
-do $SYSTEM.OBJ.DisplayError(sc)
-quit:$SYSTEM.Status.IsError(sc)
-
-set sc=$SYSTEM.OBJ.DeletePackage("DHA.BI.CubeCacheWarmer")
-do $SYSTEM.OBJ.DisplayError(sc)
-quit:$SYSTEM.Status.IsError(sc)
-
-for className="DHA.BI.CubeCacheWarmer.Model.CacheWarmQuery","DHA.BI.CubeCacheWarmer.Model.CacheWarmRun","DHA.BI.CubeCacheWarmer.Model.DashboardUsage","DHA.BI.CubeCacheWarmer.Model.QueryUsage" {
-    set sc=##class(%ExtentMgr.Util).DeleteExtentDefinitionIfExists(className)
-    do $SYSTEM.OBJ.DisplayError(sc)
-    quit:$SYSTEM.Status.IsError(sc)
-}
-```
-
-Do not use the `/deleteextent` qualifier or the `e` deletion flag. The commands
-above delete definitions and extent registrations only; the persistent
-`^DHABICCW` globals remain intact and are registered to the lowercase model
-classes when they compile. Then load the package normally and call
-`dha.bi.CubeCacheWarmer.Installer.Install()`.
-
-The Docker demo performs this case migration automatically during bootstrap.
-
 For an IPM installation, deploy the updated directory or artifact and load it in
 the same namespace:
 
@@ -280,13 +246,13 @@ Before upgrading production:
 IPM invokes the package cleanup hook automatically:
 
 ```objectscript
-zpm "uninstall dha.bi.CubeCacheWarmer"
+zpm "uninstall iris-bi-cube-cache-warmer"
 ```
 
 For a source installation, remove both audit hooks before deleting classes:
 
 ```objectscript
-set sc=##class(dha.bi.CubeCacheWarmer.Installer).Uninstall()
+set sc=##class(dc.bi.CubeCacheWarmer.Installer).Uninstall()
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 

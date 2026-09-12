@@ -1,5 +1,5 @@
 /// Persistent execution frequency for a normalized IRIS BI query.
-Class dha.bi.CubeCacheWarmer.Model.QueryUsage Extends (%Persistent, %JSON.Adaptor)
+Class dc.bi.CubeCacheWarmer.Model.QueryUsage Extends (%Persistent, %JSON.Adaptor)
 {
 
 /// IRIS BI's normalized query key. This is also the record ID.
@@ -30,11 +30,11 @@ Storage Default
 <Value name="5"><Value>FirstExecutedAt</Value></Value>
 <Value name="6"><Value>LastExecutedAt</Value></Value>
 </Data>
-<DataLocation>^DHABICCW.QueryUsageD</DataLocation>
+<DataLocation>^dc.bi.CCW.QueryUsageD</DataLocation>
 <DefaultData>QueryUsageDefaultData</DefaultData>
-<IdLocation>^DHABICCW.QueryUsageD</IdLocation>
-<IndexLocation>^DHABICCW.QueryUsageI</IndexLocation>
-<StreamLocation>^DHABICCW.QueryUsageS</StreamLocation>
+<IdLocation>^dc.bi.CCW.QueryUsageD</IdLocation>
+<IndexLocation>^dc.bi.CCW.QueryUsageI</IndexLocation>
+<StreamLocation>^dc.bi.CCW.QueryUsageS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

@@ -3,7 +3,7 @@ Include %occStatus
 /// Warms IRIS Business Intelligence caches after a cube build or synchronization.
 /// Saved pivots and their dashboard default-filter variants are executed through
 /// the standard cache-enabled %DeepSee.ResultSet API.
-Class dha.bi.CubeCacheWarmer.CacheWarmer Extends %RegisteredObject
+Class dc.bi.CubeCacheWarmer.CacheWarmer Extends %RegisteredObject
 {
 
 /// Queue warming in a background process. Use this from Cube Manager Post-Build
@@ -14,7 +14,7 @@ ClassMethod QueueCube(pCubeName As %String, pWaitSeconds As %Integer = 600, pVer
   If pCubeName = "" Quit $$$ERROR($$$GeneralError,"A cube name is required")
   If pWaitSeconds < 0 Quit $$$ERROR($$$GeneralError,"pWaitSeconds cannot be negative")
 
-  Job ##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmWhenAvailable(pCubeName,pWaitSeconds,pVerbose,pStopOnError)
+  Job ##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmWhenAvailable(pCubeName,pWaitSeconds,pVerbose,pStopOnError)
   Set pJobId = $ZCHILD
   If 'pJobId Quit $$$ERROR($$$GeneralError,"Unable to start a cache warming job for "_pCubeName)
   If pVerbose Write !,"Queued cache warming for [",pCubeName,"] as job ",pJobId,!
@@ -29,7 +29,7 @@ ClassMethod WarmWhenAvailable(pCubeName As %String, pWaitSeconds As %Integer = 6
   Do ..LogStatusError("Unable to start cache-warming history: ",tHistorySC)
 
   Set tKey = $ZCONVERT(pCubeName,"U")
-  Lock +^DHABICCW.CacheWarmerLock("cube",tKey):0
+  Lock +^dc.bi.CCW.CacheWarmerLock("cube",tKey):0
   If '$TEST {
     Do ..FinishEmptyRun(pCubeName,tRunId,0,$$$OK,"Skipped","Another worker was already warming this cube",.tStats)
     Quit $$$OK
@@ -50,7 +50,7 @@ ClassMethod WarmWhenAvailable(pCubeName As %String, pWaitSeconds As %Integer = 6
 
   If 'tRunFinished Do ..FinishEmptyRun(pCubeName,tRunId,$ZH-tStart,tSC,"","",.tStats)
 
-  Lock -^DHABICCW.CacheWarmerLock("cube",tKey)
+  Lock -^dc.bi.CCW.CacheWarmerLock("cube",tKey)
   If $$$ISERR(tSC) {
     Do ..Log("Cache warming failed for "_pCubeName_": "_$System.Status.GetErrorText(tSC))
   } Else {
@@ -116,8 +116,8 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
       Quit
     }
 
-    &sql(DECLARE DHABICubeCacheWarmerPivots CURSOR FOR SELECT %ID FROM %DeepSee_Dashboard.Pivot)
-    &sql(OPEN DHABICubeCacheWarmerPivots)
+    &sql(DECLARE CubeCacheWarmerPivots CURSOR FOR SELECT %ID FROM %DeepSee_Dashboard.Pivot)
+    &sql(OPEN CubeCacheWarmerPivots)
     If SQLCODE < 0 {
       Set tSC = $$$ERROR($$$GeneralError,"Unable to enumerate saved pivots. SQLCODE="_SQLCODE_" "_$Get(%msg))
       Quit
@@ -125,7 +125,7 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
     Set tCursorOpen = 1
 
     For {
-      &sql(FETCH DHABICubeCacheWarmerPivots INTO :tPivotId)
+      &sql(FETCH CubeCacheWarmerPivots INTO :tPivotId)
       Quit:SQLCODE'=0
 
       Set tOpenSC = $$$OK
@@ -156,7 +156,7 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
     }
 
     If tCursorOpen {
-      &sql(CLOSE DHABICubeCacheWarmerPivots)
+      &sql(CLOSE CubeCacheWarmerPivots)
       Set tCursorOpen = 0
     }
 
@@ -207,7 +207,7 @@ ClassMethod WarmCube(pCubeName As %String, pStopOnError As %Boolean = 0, pVerbos
   }
 
   If tCursorOpen {
-    &sql(CLOSE DHABICubeCacheWarmerPivots)
+    &sql(CLOSE CubeCacheWarmerPivots)
   }
   Set pStats("finished") = ..CurrentTimestamp()
   Set pStats("elapsedTime") = $ZH-tStart
@@ -304,11 +304,11 @@ ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1
       Set tSC = $$$ERROR($$$GeneralError,"An MDX query is required")
       Quit
     }
-    Set ^||DHABICCW.CacheWarmer("active") = $Get(^||DHABICCW.CacheWarmer("active"))+1
+    Set ^||dc.bi.CCW.CacheWarmer("active") = $Get(^||dc.bi.CCW.CacheWarmer("active"))+1
     Set tAuditSuppressed = 1
     Set tResult = ##class(%DeepSee.ResultSet).%ExecuteDirect(pMDX,.pParameters,.tSC)
-    Set ^||DHABICCW.CacheWarmer("active") = ^||DHABICCW.CacheWarmer("active")-1
-    If ^||DHABICCW.CacheWarmer("active")<1 Kill ^||DHABICCW.CacheWarmer("active")
+    Set ^||dc.bi.CCW.CacheWarmer("active") = ^||dc.bi.CCW.CacheWarmer("active")-1
+    If ^||dc.bi.CCW.CacheWarmer("active")<1 Kill ^||dc.bi.CCW.CacheWarmer("active")
     Set tAuditSuppressed = 0
     If $$$ISERR(tSC) Quit
     If '$IsObject(tResult) {
@@ -321,9 +321,9 @@ ClassMethod WarmMDX(pMDX As %String, ByRef pParameters, pVerbose As %Boolean = 1
     Set pStats("rows") = tResult.%GetRowCount()
     Set pStats("columns") = tResult.%GetColumnCount()
   } Catch ex {
-    If tAuditSuppressed,$Get(^||DHABICCW.CacheWarmer("active"))>0 {
-      Set ^||DHABICCW.CacheWarmer("active") = ^||DHABICCW.CacheWarmer("active")-1
-      If ^||DHABICCW.CacheWarmer("active")<1 Kill ^||DHABICCW.CacheWarmer("active")
+    If tAuditSuppressed,$Get(^||dc.bi.CCW.CacheWarmer("active"))>0 {
+      Set ^||dc.bi.CCW.CacheWarmer("active") = ^||dc.bi.CCW.CacheWarmer("active")-1
+      If ^||dc.bi.CCW.CacheWarmer("active")<1 Kill ^||dc.bi.CCW.CacheWarmer("active")
     }
     Set tSC = ex.AsStatus()
   }
@@ -355,16 +355,16 @@ ClassMethod WarmPopularQueries(pCubeName As %String, pTarget As %String, pTarget
   Set tOverallSC = $$$OK
   Set tFrequencyRank = 0
 
-  &sql(DECLARE DHABICubeCacheWarmerFrequency CURSOR FOR
+  &sql(DECLARE CubeCacheWarmerFrequency CURSOR FOR
     SELECT QueryKey, CubeName, MDX, ExecutionCount
-    FROM dha_bi_CubeCacheWarmer_Model.QueryUsage
+    FROM dc_bi_CubeCacheWarmer_Model.QueryUsage
     WHERE ExecutionCount > 0
     ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey)
-  &sql(OPEN DHABICubeCacheWarmerFrequency)
+  &sql(OPEN CubeCacheWarmerFrequency)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate query frequency. SQLCODE="_SQLCODE_" "_$Get(%msg))
 
   For {
-    &sql(FETCH DHABICubeCacheWarmerFrequency INTO :tQueryKey,:tQueryCube,:tMDX,:tFrequency)
+    &sql(FETCH CubeCacheWarmerFrequency INTO :tQueryKey,:tQueryCube,:tMDX,:tFrequency)
     Quit:SQLCODE'=0
     Set tQueryBase = ##class(%DeepSee.Utils).%GetBaseCube(tQueryCube)
     If tQueryBase = "" Set tQueryBase = tQueryCube
@@ -389,7 +389,7 @@ ClassMethod WarmPopularQueries(pCubeName As %String, pTarget As %String, pTarget
   }
 
   Set tFetchCode = SQLCODE
-  &sql(CLOSE DHABICubeCacheWarmerFrequency)
+  &sql(CLOSE CubeCacheWarmerFrequency)
   If ('pStopped),(tFetchCode<0) Quit $$$ERROR($$$GeneralError,"Error while enumerating query frequency. SQLCODE="_tFetchCode_" "_$Get(%msg))
   Quit tOverallSC
 }
@@ -419,16 +419,16 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
   Set tOverallSC = $$$OK
   Set tDashboardRank = 0
 
-  &sql(DECLARE DHABICubeCacheWarmerDashboards CURSOR FOR
+  &sql(DECLARE CubeCacheWarmerDashboards CURSOR FOR
     SELECT d.%ID, COALESCE(u.OpenCount,0)
     FROM %DeepSee_Dashboard.Definition d
-    LEFT JOIN dha_bi_CubeCacheWarmer_Model.DashboardUsage u ON u.DashboardName = d.fullName
+    LEFT JOIN dc_bi_CubeCacheWarmer_Model.DashboardUsage u ON u.DashboardName = d.fullName
     ORDER BY COALESCE(u.OpenCount,0) DESC, d.lastAccessed DESC, d.fullName)
-  &sql(OPEN DHABICubeCacheWarmerDashboards)
+  &sql(OPEN CubeCacheWarmerDashboards)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate dashboards. SQLCODE="_SQLCODE_" "_$Get(%msg))
 
   For {
-    &sql(FETCH DHABICubeCacheWarmerDashboards INTO :tDashboardId,:tDashboardOpenCount)
+    &sql(FETCH CubeCacheWarmerDashboards INTO :tDashboardId,:tDashboardOpenCount)
     Quit:SQLCODE'=0
     Set tDashboardRank = tDashboardRank+1
     If tDashboardOpenCount>0 Set pStats("priorityDashboards") = pStats("priorityDashboards")+1
@@ -601,7 +601,7 @@ ClassMethod WarmDashboardQueries(pCubeName As %String, pTarget As %String, pTarg
   }
 
   Set tFetchCode = SQLCODE
-  &sql(CLOSE DHABICubeCacheWarmerDashboards)
+  &sql(CLOSE CubeCacheWarmerDashboards)
   If ('pStopped),(tFetchCode<0) Quit $$$ERROR($$$GeneralError,"Error while enumerating dashboards. SQLCODE="_tFetchCode_" "_$Get(%msg))
   Quit tOverallSC
 }
@@ -680,21 +680,21 @@ ClassMethod PurgeHistory(pDaysToKeep As %Integer = 30, Output pDeleted As %Integ
   Set tCutoff = $ZDATETIME(tCutoffH,3,1,6)
   Set tSC = $$$OK
 
-  &sql(DECLARE DHABICubeCacheWarmerOldRuns CURSOR FOR
-    SELECT %ID FROM dha_bi_CubeCacheWarmer_Model.CacheWarmRun
+  &sql(DECLARE CubeCacheWarmerOldRuns CURSOR FOR
+    SELECT %ID FROM dc_bi_CubeCacheWarmer_Model.CacheWarmRun
     WHERE StartedAt < :tCutoff AND Outcome <> 'Running')
-  &sql(OPEN DHABICubeCacheWarmerOldRuns)
+  &sql(OPEN CubeCacheWarmerOldRuns)
   If SQLCODE < 0 Quit $$$ERROR($$$GeneralError,"Unable to enumerate cache-warming history. SQLCODE="_SQLCODE_" "_$Get(%msg))
 
   For {
-    &sql(FETCH DHABICubeCacheWarmerOldRuns INTO :tRunId)
+    &sql(FETCH CubeCacheWarmerOldRuns INTO :tRunId)
     Quit:SQLCODE'=0
-    Set tSC = ##class(dha.bi.CubeCacheWarmer.Model.CacheWarmRun).%DeleteId(tRunId)
+    Set tSC = ##class(dc.bi.CubeCacheWarmer.Model.CacheWarmRun).%DeleteId(tRunId)
     Quit:$$$ISERR(tSC)
     Set pDeleted = pDeleted+1
   }
   Set tFetchCode = SQLCODE
-  &sql(CLOSE DHABICubeCacheWarmerOldRuns)
+  &sql(CLOSE CubeCacheWarmerOldRuns)
   If $$$ISERR(tSC) Quit tSC
   If tFetchCode < 0 Quit $$$ERROR($$$GeneralError,"Unable to fetch cache-warming history. SQLCODE="_tFetchCode_" "_$Get(%msg))
   Quit $$$OK
@@ -758,7 +758,7 @@ ClassMethod FinishEmptyRun(pCubeName As %String, pRunId As %Integer, pElapsedSec
 ClassMethod StartRun(pCubeName As %String, pMode As %String, Output pRunId As %Integer) As %Status [ Private ]
 {
   Set pRunId = 0
-  Set tRun = ##class(dha.bi.CubeCacheWarmer.Model.CacheWarmRun).%New()
+  Set tRun = ##class(dc.bi.CubeCacheWarmer.Model.CacheWarmRun).%New()
   Set tRun.CubeName = $Extract(pCubeName,1,128)
   Set tRun.Mode = $Extract(pMode,1,32)
   Set tRun.Outcome = "Running"
@@ -772,7 +772,7 @@ ClassMethod StartRun(pCubeName As %String, pMode As %String, Output pRunId As %I
 ClassMethod UpdateRunCube(pRunId As %Integer, pCubeName As %String) As %Status [ Private ]
 {
   If pRunId < 1 Quit $$$OK
-  Set tRun = ##class(dha.bi.CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tSC)
+  Set tRun = ##class(dc.bi.CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tSC)
   If $$$ISERR(tSC) Quit tSC
   If '$IsObject(tRun) Quit $$$ERROR($$$GeneralError,"Cache-warming run not found: "_pRunId)
   Set tRun.CubeName = $Extract(pCubeName,1,128)
@@ -782,11 +782,11 @@ ClassMethod UpdateRunCube(pRunId As %Integer, pCubeName As %String) As %Status [
 ClassMethod SaveQuery(pRunId As %Integer, pQueryName As %String, ByRef pStats, pSC As %Status, pSourceType As %String = "AdHocMDX", pDashboardName As %String = "", pWidgetName As %String = "", pDefaultFilterCount As %Integer = 0, pDashboardOpenCount As %Integer = 0, pPriorityOrder As %Integer = 0, pQueryFrequency As %Integer = 0) As %Status [ Private ]
 {
   If pRunId < 1 Quit $$$OK
-  Set tRun = ##class(dha.bi.CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
+  Set tRun = ##class(dc.bi.CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
   If $$$ISERR(tOpenSC) Quit tOpenSC
   If '$IsObject(tRun) Quit $$$ERROR($$$GeneralError,"Cache-warming run not found: "_pRunId)
 
-  Set tQuery = ##class(dha.bi.CubeCacheWarmer.Model.CacheWarmQuery).%New()
+  Set tQuery = ##class(dc.bi.CubeCacheWarmer.Model.CacheWarmQuery).%New()
   Set tQuery.Run = tRun
   Set tQuery.QueryName = $Extract(pQueryName,1,512)
   Set tQuery.SourceType = $Extract(pSourceType,1,32)
@@ -809,7 +809,7 @@ ClassMethod SaveQuery(pRunId As %Integer, pQueryName As %String, ByRef pStats, p
 ClassMethod FinishRun(pRunId As %Integer, ByRef pStats, pSC As %Status, pOutcome As %String = "", pStatusText As %String = "") As %Status [ Private ]
 {
   If pRunId < 1 Quit $$$OK
-  Set tRun = ##class(dha.bi.CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
+  Set tRun = ##class(dc.bi.CubeCacheWarmer.Model.CacheWarmRun).%OpenId(pRunId,,.tOpenSC)
   If $$$ISERR(tOpenSC) Quit tOpenSC
   If '$IsObject(tRun) Quit $$$ERROR($$$GeneralError,"Cache-warming run not found: "_pRunId)
 
@@ -841,7 +841,7 @@ ClassMethod LogStatusError(pPrefix As %String, pSC As %Status) [ Private ]
 
 ClassMethod Log(pMessage As %String) As %Status [ Private ]
 {
-  Quit ##class(%DeepSee.Utils).%WriteToLog("DHABICCW",pMessage)
+  Quit ##class(%DeepSee.Utils).%WriteToLog("CubeCacheWarmer",pMessage)
 }
 
 }

@@ -91,7 +91,7 @@ Bootstrap performs the following work:
 3. Enables the namespace for interoperability and Analytics.
 4. Installs InterSystems Package Manager (IPM) if the durable volume predates
    the image that ships it.
-5. Loads `dha.bi.CubeCacheWarmer` from the root `module.xml` with IPM, whose
+5. Loads `dc.bi.CubeCacheWarmer` from the root `module.xml` with IPM, whose
    Activate hook installs the dashboard-open and normalized-query-frequency
    audit hooks.
 6. Imports and compiles the demo application.
@@ -178,7 +178,7 @@ Inspect recent warmer runs in the Management Portal SQL page while using the
 SELECT TOP 20 %ID AS RunId, CubeName, Mode, Outcome,
        TotalQueries, SucceededQueries, FailedQueries,
        EnumerationErrors, ElapsedSeconds, StatusText
-FROM dha_bi_CubeCacheWarmer_Model.CacheWarmRun
+FROM dc_bi_CubeCacheWarmer_Model.CacheWarmRun
 ORDER BY %ID DESC
 ```
 
@@ -190,7 +190,7 @@ After exercising dashboards and pivots, inspect the real frequency source:
 
 ```sql
 SELECT CubeName, QueryKey, ExecutionCount, LastExecutedAt
-FROM dha_bi_CubeCacheWarmer_Model.QueryUsage
+FROM dc_bi_CubeCacheWarmer_Model.QueryUsage
 ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey
 ```
 

@@ -10,7 +10,7 @@ XData Registry [ XMLNamespace = "http://www.intersystems.com/deepsee" ]
   <Groups>
     <RegistryMapGroup GroupName="Disease Registry Diagnoses" IsRegistered="true" Disabled="false" BuildAsynch="true">
       <Cubes>
-        <RegistryMapCube CubeKey="DISEASEREGISTRYDIAGNOSES" CubeDisplayName="Disease Registry Diagnoses" Disabled="false" DSTimeEnabled="true" BuildAsynch="true" PostSynchCode="do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryDiagnoses&quot;)" PostBuildCode="do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryDiagnoses&quot;)">
+        <RegistryMapCube CubeKey="DISEASEREGISTRYDIAGNOSES" CubeDisplayName="Disease Registry Diagnoses" Disabled="false" DSTimeEnabled="true" BuildAsynch="true" PostSynchCode="do ##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryDiagnoses&quot;)" PostBuildCode="do ##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryDiagnoses&quot;)">
           <UpdatePlan>BuildSynch</UpdatePlan>
           <CustomBuildOrder>1</CustomBuildOrder>
           <BuildFrequency>1</BuildFrequency>
@@ -31,7 +31,7 @@ XData Registry [ XMLNamespace = "http://www.intersystems.com/deepsee" ]
     </RegistryMapGroup>
     <RegistryMapGroup GroupName="Disease Registry Patients" IsRegistered="true" Disabled="false" BuildAsynch="true">
       <Cubes>
-        <RegistryMapCube CubeKey="DISEASEREGISTRYPATIENTS" CubeDisplayName="Disease Registry Patients" Disabled="false" DSTimeEnabled="true" BuildAsynch="true" PostSynchCode="do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryPatients&quot;)" PostBuildCode="do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryPatients&quot;)">
+        <RegistryMapCube CubeKey="DISEASEREGISTRYPATIENTS" CubeDisplayName="Disease Registry Patients" Disabled="false" DSTimeEnabled="true" BuildAsynch="true" PostSynchCode="do ##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryPatients&quot;)" PostBuildCode="do ##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube(&quot;DiseaseRegistryPatients&quot;)">
           <UpdatePlan>BuildSynch</UpdatePlan>
           <CustomBuildOrder>1</CustomBuildOrder>
           <BuildFrequency>1</BuildFrequency>
@@ -51,7 +51,7 @@ XData Registry [ XMLNamespace = "http://www.intersystems.com/deepsee" ]
       <SynchTimeUnit>Minute</SynchTimeUnit>
     </RegistryMapGroup>
   </Groups>
-  <Description>DHA Disease Registry cube synchronization</Description>
+  <Description>Disease Registry cube synchronization</Description>
 </RegistryMap>
 }
 

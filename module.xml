@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-  <Document name="dha.bi.CubeCacheWarmer.ZPM">
+  <Document name="iris-bi-cube-cache-warmer.ZPM">
     <Module>
-      <Name>dha.bi.CubeCacheWarmer</Name>
+      <Name>iris-bi-cube-cache-warmer</Name>
       <Description>True query-frequency-ordered cache warming for InterSystems IRIS Business Intelligence cubes and dashboards.</Description>
-      <Version>1.2.0</Version>
+      <Version>2.0.0</Version>
       <Keywords>analytics,bi,deepsee,cube,cache,dashboard,mdx,cube manager</Keywords>
       <Author>
         <Person>Joseph Saliba</Person>
@@ -13,12 +13,12 @@
         <Notes>https://github.com/josaliba/deepsee-cube-cache-warmer</Notes>
       </Author>
       <Packaging>module</Packaging>
-      <SourcesRoot>packages/dha-bi-cube-cache-warmer/src</SourcesRoot>
-      <Resource Name="dha.bi.CubeCacheWarmer.PKG"/>
-      <UnitTest Name="/packages/dha-bi-cube-cache-warmer/tests/" Package="dha.bi.CubeCacheWarmer.Test" Phase="test"/>
+      <SourcesRoot>packages</SourcesRoot>
+      <Resource Name="dc.bi.CubeCacheWarmer.PKG" Directory="cube-cache-warmer/src"/>
+      <UnitTest Name="/packages/cube-cache-warmer/tests/" Package="dc.bi.CubeCacheWarmer.Test" Phase="test"/>
       <SystemRequirements Version=">=2021.1"/>
-      <Invoke Class="dha.bi.CubeCacheWarmer.Installer" Method="Install" Phase="Activate" When="After"/>
-      <Invoke Class="dha.bi.CubeCacheWarmer.Installer" Method="Uninstall" Phase="Clean" When="Before"/>
+      <Invoke Class="dc.bi.CubeCacheWarmer.Installer" Method="Install" Phase="Activate" When="After"/>
+      <Invoke Class="dc.bi.CubeCacheWarmer.Installer" Method="Uninstall" Phase="Clean" When="Before"/>
     </Module>
   </Document>
 </Export>

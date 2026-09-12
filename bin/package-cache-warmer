@@ -6,11 +6,11 @@ set -Eeuo pipefail
 # rewrites its repository-relative paths so the archive loads on its own.
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-package_name="dha-bi-cube-cache-warmer"
+package_name="cube-cache-warmer"
 package_dir="${project_root}/packages/${package_name}"
 package_version="$(sed -n 's:.*<Version>\([^<]*\)</Version>.*:\1:p' "${project_root}/module.xml" | head -n 1)"
 archive_dir="${project_root}/dist"
-archive_path="${archive_dir}/${package_name}-${package_version}.tar.gz"
+archive_path="${archive_dir}/iris-bi-cube-cache-warmer-${package_version}.tar.gz"
 
 staging_dir="$(mktemp -d)"
 trap 'rm -rf "${staging_dir}"' EXIT
@@ -18,8 +18,10 @@ trap 'rm -rf "${staging_dir}"' EXIT
 mkdir -p "${archive_dir}" "${staging_dir}/${package_name}"
 cp -R "${package_dir}/." "${staging_dir}/${package_name}/"
 cp "${project_root}/LICENSE" "${staging_dir}/${package_name}/LICENSE"
-sed "s#packages/${package_name}/##g" "${project_root}/module.xml" \
-  > "${staging_dir}/${package_name}/module.xml"
+sed -e "s#<SourcesRoot>packages</SourcesRoot>#<SourcesRoot>src</SourcesRoot>#" \
+    -e "s# Directory=\"${package_name}/src\"##" \
+    -e "s#/packages/${package_name}/tests/#/tests/#" \
+    "${project_root}/module.xml" > "${staging_dir}/${package_name}/module.xml"
 
 tar --exclude='.DS_Store' -czf "${archive_path}" -C "${staging_dir}" "${package_name}"
 printf '%s\n' "${archive_path}"

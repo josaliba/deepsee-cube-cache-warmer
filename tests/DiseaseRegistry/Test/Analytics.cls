@@ -53,7 +53,7 @@ Method TestCubeManagerRegistry()
       Do $$$AssertTrue(cube.DSTimeEnabled)
       Do $$$AssertEquals(cube.Disabled,0)
       Do $$$AssertNotEquals(cube.PostBuildCode,"")
-      Do $$$AssertTrue(cube.PostBuildCode["dha.bi.CubeCacheWarmer.CacheWarmer")
+      Do $$$AssertTrue(cube.PostBuildCode["dc.bi.CubeCacheWarmer.CacheWarmer")
       Do $$$AssertEquals(cube.PostSynchCode,cube.PostBuildCode)
     }
   }

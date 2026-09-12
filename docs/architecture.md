@@ -1,6 +1,6 @@
 # Architecture and execution flow
 
-`dha.bi.CubeCacheWarmer` executes real IRIS BI MDX queries so IRIS repopulates
+`dc.bi.CubeCacheWarmer` executes real IRIS BI MDX queries so IRIS repopulates
 its standard result cache. It does not implement or store a separate cache.
 
 ## High-level flow
@@ -43,16 +43,16 @@ flowchart TD
 
 | Class | Responsibility |
 | --- | --- |
-| `dha.bi.CubeCacheWarmer.CacheWarmer` | Queueing, worker coalescing, discovery, MDX execution, statistics, and retention |
-| `dha.bi.CubeCacheWarmer.DashboardUsage` | Installation and execution of the dashboard-open audit hook |
-| `dha.bi.CubeCacheWarmer.QueryUsage` | Query-audit installation, normalized frequency counting, and native-log import |
-| `dha.bi.CubeCacheWarmer.Installer` | Package lifecycle entry points |
+| `dc.bi.CubeCacheWarmer.CacheWarmer` | Queueing, worker coalescing, discovery, MDX execution, statistics, and retention |
+| `dc.bi.CubeCacheWarmer.DashboardUsage` | Installation and execution of the dashboard-open audit hook |
+| `dc.bi.CubeCacheWarmer.QueryUsage` | Query-audit installation, normalized frequency counting, and native-log import |
+| `dc.bi.CubeCacheWarmer.Installer` | Package lifecycle entry points |
 | `Model.CacheWarmRun` | One persistent row per warmer invocation |
 | `Model.CacheWarmQuery` | One child row per executed MDX query |
 | `Model.DashboardUsage` | Aggregate dashboard-open count and timestamps |
 | `Model.QueryUsage` | Normalized query key, replayable MDX, execution count, and first/last timestamps |
 
-All package globals use the `^DHABICCW` prefix and are stored in the target
+All package globals use the `^dc.bi.CCW` prefix and are stored in the target
 namespace's database.
 
 ## Trigger paths
@@ -62,7 +62,7 @@ namespace's database.
 Configure both Cube Manager Post-Build and Post-Synchronize code with:
 
 ```objectscript
-do ##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
+do ##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube")
 ```
 
 `QueueCube()` validates its inputs and starts `WarmWhenAvailable()` in a separate
@@ -87,7 +87,7 @@ caller.
 The worker takes this logical lock:
 
 ```objectscript
-^DHABICCW.CacheWarmerLock("cube",uppercaseCubeName)
+^dc.bi.CCW.CacheWarmerLock("cube",uppercaseCubeName)
 ```
 
 The lock has a zero-second timeout. Only one process can wait for and warm a

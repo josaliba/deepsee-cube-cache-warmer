@@ -32,7 +32,7 @@ SELECT TOP 20
        EnumerationErrors,
        ElapsedSeconds,
        StatusText
-FROM dha_bi_CubeCacheWarmer_Model.CacheWarmRun
+FROM dc_bi_CubeCacheWarmer_Model.CacheWarmRun
 ORDER BY %ID DESC
 ```
 
@@ -66,10 +66,10 @@ SELECT Run AS RunId,
        ElapsedSeconds,
        Success,
        StatusText
-FROM dha_bi_CubeCacheWarmer_Model.CacheWarmQuery
+FROM dc_bi_CubeCacheWarmer_Model.CacheWarmQuery
 WHERE Run = (
     SELECT MAX(%ID)
-    FROM dha_bi_CubeCacheWarmer_Model.CacheWarmRun
+    FROM dc_bi_CubeCacheWarmer_Model.CacheWarmRun
     WHERE Outcome <> 'Running'
 )
 ORDER BY PriorityOrder, QueryName
@@ -90,7 +90,7 @@ SELECT CubeName,
        ExecutionCount,
        FirstExecutedAt,
        LastExecutedAt
-FROM dha_bi_CubeCacheWarmer_Model.QueryUsage
+FROM dc_bi_CubeCacheWarmer_Model.QueryUsage
 ORDER BY ExecutionCount DESC, LastExecutedAt DESC, QueryKey
 ```
 
@@ -98,7 +98,7 @@ Seed existing native history once when installing into an established
 namespace:
 
 ```objectscript
-set sc=##class(dha.bi.CubeCacheWarmer.QueryUsage).ImportQueryLog(1,.imported)
+set sc=##class(dc.bi.CubeCacheWarmer.QueryUsage).ImportQueryLog(1,.imported)
 do $SYSTEM.OBJ.DisplayError(sc)
 write !,"Imported executions: ",imported,!
 ```
@@ -117,7 +117,7 @@ SELECT Run AS RunId,
        CubeName,
        ElapsedSeconds,
        StatusText
-FROM dha_bi_CubeCacheWarmer_Model.CacheWarmQuery
+FROM dc_bi_CubeCacheWarmer_Model.CacheWarmQuery
 WHERE Success = 0
 ORDER BY Run DESC, QueryName
 ```
@@ -133,7 +133,7 @@ SELECT %ID AS RunId,
        FailedQueries,
        EnumerationErrors,
        StatusText
-FROM dha_bi_CubeCacheWarmer_Model.CacheWarmRun
+FROM dc_bi_CubeCacheWarmer_Model.CacheWarmRun
 WHERE Outcome IN ('Failure','PartialFailure')
 ORDER BY %ID DESC
 ```
@@ -149,7 +149,7 @@ workload. This example finds runs older than one hour:
 
 ```sql
 SELECT %ID AS RunId, CubeName, Mode, ProcessId, StartedAt, StatusText
-FROM dha_bi_CubeCacheWarmer_Model.CacheWarmRun
+FROM dc_bi_CubeCacheWarmer_Model.CacheWarmRun
 WHERE Outcome = 'Running'
   AND StartedAt < DATEADD(hour,-1,CURRENT_TIMESTAMP)
 ORDER BY StartedAt
@@ -166,7 +166,7 @@ SELECT DashboardName,
        OpenCount,
        FirstOpenedAt,
        LastOpenedAt
-FROM dha_bi_CubeCacheWarmer_Model.DashboardUsage
+FROM dc_bi_CubeCacheWarmer_Model.DashboardUsage
 ORDER BY OpenCount DESC, LastOpenedAt DESC
 ```
 
@@ -184,7 +184,7 @@ SELECT CubeName,
        SUM(CASE WHEN Success=1 THEN 1 ELSE 0 END) AS Successful,
        AVG(ElapsedSeconds) AS AverageSeconds,
        MAX(ElapsedSeconds) AS MaximumSeconds
-FROM dha_bi_CubeCacheWarmer_Model.CacheWarmQuery
+FROM dc_bi_CubeCacheWarmer_Model.CacheWarmQuery
 GROUP BY CubeName, SourceType
 ORDER BY CubeName, SourceType
 ```
@@ -197,7 +197,7 @@ workload remains appropriate as dashboards evolve.
 Queue background cube warming:
 
 ```objectscript
-set sc=##class(dha.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube",600,1,0,.jobId)
+set sc=##class(dc.bi.CubeCacheWarmer.CacheWarmer).QueueCube("MyCube",600,1,0,.jobId)
 do $SYSTEM.OBJ.DisplayError(sc)
 write !,"Job: ",jobId,!
 ```
@@ -205,7 +205,7 @@ write !,"Job: ",jobId,!
 Warm a cube synchronously:
 
 ```objectscript
-set sc=##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmCube("MyCube",0,1,.stats)
+set sc=##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmCube("MyCube",0,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 zwrite stats
 ```
@@ -214,7 +214,7 @@ Warm one saved pivot:
 
 ```objectscript
 kill parameters
-set sc=##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmPivot("Folder/My Pivot.pivot",.parameters,1,.stats)
+set sc=##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmPivot("Folder/My Pivot.pivot",.parameters,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 zwrite stats
 ```
@@ -224,14 +224,14 @@ Warm arbitrary MDX:
 ```objectscript
 set mdx="SELECT {[Measures].[%Count]} ON 0 FROM [MyCube]"
 kill parameters
-set sc=##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmMDX(mdx,.parameters,1,.stats)
+set sc=##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmMDX(mdx,.parameters,1,.stats)
 do $SYSTEM.OBJ.DisplayError(sc)
 zwrite stats
 ```
 
 ## Logs
 
-The warmer writes BI task summaries with source label `DHABICCW` to the
+The warmer writes BI task summaries with source label `CubeCacheWarmer` to the
 namespace's DeepSee task log, commonly named
 `DeepSeeTasks_<NAMESPACE>.log`. Query and enumeration errors include their IRIS
 status text.
@@ -250,7 +250,7 @@ additional diagnostic context.
 History is not deleted automatically. Delete completed runs older than 30 days:
 
 ```objectscript
-set sc=##class(dha.bi.CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
+set sc=##class(dc.bi.CubeCacheWarmer.CacheWarmer).PurgeHistory(30,.deleted)
 do $SYSTEM.OBJ.DisplayError(sc)
 write !,"Deleted runs: ",deleted,!
 ```
@@ -298,7 +298,7 @@ open or a query execution.
 
 ### `EnumerationErrors` is nonzero
 
-Inspect `StatusText`, failed child queries, and the `DHABICCW` log entries. Common
+Inspect `StatusText`, failed child queries, and the `CubeCacheWarmer` log entries. Common
 causes include deleted pivots, invalid widget data sources, unavailable runtime
 settings, or malformed saved defaults.
 

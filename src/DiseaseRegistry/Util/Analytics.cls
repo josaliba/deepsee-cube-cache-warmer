@@ -340,9 +340,9 @@ ClassMethod SaveManualPivot(pFullName As %String, pCubeName As %String, pMDX As 
 
 ClassMethod WarmAll() As %Status
 {
-  Set tSC = ##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmCube("DiseaseRegistryPatients",0,1,.tPatientStats)
+  Set tSC = ##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmCube("DiseaseRegistryPatients",0,1,.tPatientStats)
   If $$$ISERR(tSC) Quit tSC
-  Set tSC = ##class(dha.bi.CubeCacheWarmer.CacheWarmer).WarmCube("DiseaseRegistryDiagnoses",0,1,.tDiagnosisStats)
+  Set tSC = ##class(dc.bi.CubeCacheWarmer.CacheWarmer).WarmCube("DiseaseRegistryDiagnoses",0,1,.tDiagnosisStats)
   If $$$ISERR(tSC) Quit tSC
   Write !,"Warmed ",tPatientStats("succeeded")+tDiagnosisStats("succeeded")," saved queries.",!
   Quit $$$OK
