@@ -1,7 +1,7 @@
 # DeepSee Cube Cache Warmer
 
 [![IPM](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer/badge.svg)](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer)
-[![Open Exchange](https://img.shields.io/badge/Open%20Exchange-iris--bi--cube--cache--warmer-00b2a9)](https://openexchange.intersystems.com/package/iris-bi-cube-cache-warmer)
+[![Open Exchange](https://img.shields.io/badge/Open%20Exchange-deepsee--cube--cache--warmer-00b2a9)](https://openexchange.intersystems.com/package/deepsee-cube-cache-warmer)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 True query-frequency-aware cache warming for InterSystems IRIS Business Intelligence
