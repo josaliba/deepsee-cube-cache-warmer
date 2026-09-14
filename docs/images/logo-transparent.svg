@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <clipPath id="topFace">
+      <polygon points="256,170 360,230 256,290 152,230"/>
+    </clipPath>
+    <radialGradient id="surfaceHeat" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff8a2a" stop-opacity="0.95"/>
+      <stop offset="0.55" stop-color="#ff8a2a" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#ff8a2a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="airGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff8a2a" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ff8a2a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="heatWave" gradientUnits="userSpaceOnUse" x1="0" y1="240" x2="0" y2="70">
+      <stop offset="0" stop-color="#ff6a1f"/>
+      <stop offset="0.6" stop-color="#ffa53a"/>
+      <stop offset="1" stop-color="#ffd27a" stop-opacity="0.25"/>
+    </linearGradient>
+  </defs>
+  <!-- isometric data cube -->
+  <polygon points="256,170 360,230 256,290 152,230" fill="#4fd8cd"/>
+  <polygon points="152,230 256,290 256,410 152,350" fill="#00a99d"/>
+  <polygon points="256,290 360,230 360,350 256,410" fill="#00776f"/>
+  <g stroke="#ffffff" stroke-opacity="0.18" stroke-width="3" fill="none">
+    <line x1="221.3" y1="190" x2="325.3" y2="250"/>
+    <line x1="186.7" y1="210" x2="290.7" y2="270"/>
+    <line x1="290.7" y1="190" x2="186.7" y2="250"/>
+    <line x1="325.3" y1="210" x2="221.3" y2="270"/>
+    <line x1="186.7" y1="250" x2="186.7" y2="370"/>
+    <line x1="221.3" y1="270" x2="221.3" y2="390"/>
+    <line x1="152" y1="270" x2="256" y2="330"/>
+    <line x1="152" y1="310" x2="256" y2="370"/>
+    <line x1="290.7" y1="270" x2="290.7" y2="390"/>
+    <line x1="325.3" y1="250" x2="325.3" y2="370"/>
+    <line x1="256" y1="330" x2="360" y2="270"/>
+    <line x1="256" y1="370" x2="360" y2="310"/>
+  </g>
+  <!-- heat on the top surface, kept inside the face -->
+  <ellipse cx="256" cy="230" rx="118" ry="68" fill="url(#surfaceHeat)" clip-path="url(#topFace)"/>
+  <!-- warm air above the cube -->
+  <ellipse cx="256" cy="165" rx="150" ry="95" fill="url(#airGlow)"/>
+  <!-- rising heat waves -->
+  <g fill="none" stroke="url(#heatWave)" stroke-width="20" stroke-linecap="round">
+    <path d="M196 232 C172 208.9 220 189.1 196 166.0 C172 142.9 220 123.1 196 100"/>
+    <path d="M256 222 C232 194.0 280 170.0 256 142.0 C232 114.0 280 90.0 256 62"/>
+    <path d="M316 232 C292 208.9 340 189.1 316 166.0 C292 142.9 340 123.1 316 100"/>
+  </g>
+</svg>
