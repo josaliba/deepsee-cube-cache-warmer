@@ -1,6 +1,0 @@
-zn "%SYS"
-set sc=$SYSTEM.OBJ.Load("/opt/ccw-demo/docker/App.Installer.cls","ck")
-if $SYSTEM.Status.IsError(sc) { do $SYSTEM.OBJ.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1) }
-set sc=##class(App.Installer).EnsureIPM()
-if $SYSTEM.Status.IsError(sc) { do $SYSTEM.OBJ.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1) }
-halt

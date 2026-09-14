@@ -4,7 +4,7 @@
     {
       "label": "IRIS: Build and start",
       "type": "shell",
-      "command": "docker compose up --build -d",
+      "command": "docker compose up -d --build --wait",
       "group": "build",
       "problemMatcher": []
     },
@@ -18,13 +18,13 @@
     {
       "label": "IRIS: Terminal",
       "type": "shell",
-      "command": "docker compose exec iris iris session IRIS -U CCWDEMO",
+      "command": "docker compose exec iris iris session IRIS -U USER",
       "problemMatcher": []
     },
     {
       "label": "IRIS: Run tests",
       "type": "shell",
-      "command": "./bin/test",
+      "command": "docker compose exec iris iris session IRIS -U USER \"##class(Demo.Util.Tests).RunAll()\"",
       "group": "test",
       "problemMatcher": []
     },
@@ -36,4 +36,3 @@
     }
   ]
 }
-

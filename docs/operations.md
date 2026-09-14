@@ -1,7 +1,7 @@
 # Operations, monitoring, and troubleshooting
 
 Run SQL in the same Analytics namespace where the package is installed. For the
-demo, use `CCWDEMO`.
+demo, use `USER`.
 
 ## Run modes
 
@@ -236,10 +236,10 @@ namespace's DeepSee task log, commonly named
 `DeepSeeTasks_<NAMESPACE>.log`. Query and enumeration errors include their IRIS
 status text.
 
-For the Docker demo, follow IRIS container and bootstrap output with:
+For the Docker demo, follow the IRIS container output with:
 
 ```bash
-./bin/logs
+docker compose logs -f iris
 ```
 
 History tables should be the primary structured monitoring source; logs provide
@@ -263,16 +263,18 @@ Schedule retention according to operational, audit, and storage requirements.
 
 ## Troubleshooting
 
-### Classes do not exist after starting the demo
+### The demo container is not running
 
-First-time bootstrap is asynchronous. Follow `./bin/logs` and wait for:
+The demo is built entirely into the image, so a container that is running is
+ready to use. If `docker compose ps` shows it exited, read the reason with:
 
-```text
-Cube Cache Warmer Demo bootstrap complete.
+```bash
+docker compose logs iris
 ```
 
-If bootstrap failed, inspect the status immediately before that point. Confirm
-image access, namespace creation, and compilation errors.
+A `License expired` message means the cached Community Edition image is too
+old; rebuild it with `docker compose build --pull`. A build failure in
+`iris.script` shows the failing ObjectScript status in the build output.
 
 ### A run is `Skipped`
 

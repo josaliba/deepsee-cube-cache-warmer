@@ -1,72 +1,19 @@
-name: ccw-demo
-
 services:
-  iris-volume-init:
-    image: ccw-demo-iris:dev
-    container_name: ccw-demo-iris-volume-init
-    user: "0:0"
-    entrypoint:
-      - /bin/sh
-      - -c
-    command:
-      - mkdir -p /durable/config /durable/databases && chown -R 51773:51773 /durable
-    restart: "no"
-    volumes:
-      - iris-data:/durable
-
   iris:
     build:
       context: .
-      dockerfile: Dockerfile
       args:
-        IRIS_IMAGE: ${IRIS_IMAGE:-containers.intersystems.com/intersystems/iris-community:latest-em}
-    image: ccw-demo-iris:dev
-    container_name: ccw-demo-iris
-    hostname: ccw-demo
-    init: true
+        IMAGE: ${IRIS_IMAGE:-intersystemsdc/iris-community:latest-em}
+    command: --check-caps false
     restart: unless-stopped
-    depends_on:
-      iris-volume-init:
-        condition: service_completed_successfully
-    command:
-      - --check-caps
-      - "false"
-      - --after
-      - /opt/ccw-demo/docker/bootstrap.sh
-    environment:
-      ISC_DATA_DIRECTORY: /durable/config
-      ISC_CPF_MERGE_FILE: /opt/ccw-demo/docker/merge.cpf
     ports:
+      - "${IRIS_WEB_PORT:-52773}:52773"
       - "${IRIS_SUPERSERVER_PORT:-1972}:1972"
     volumes:
-      - iris-data:/durable
-      - ./module.xml:/workspace/module.xml:ro
-      - ./src:/workspace/src:ro
-      - ./tests:/workspace/tests:ro
-      - ./packages:/workspace/packages:ro
-
-  webgateway:
-    image: ${WEBGATEWAY_IMAGE:-containers.intersystems.com/intersystems/webgateway:latest-em}
-    container_name: ccw-demo-webgateway
-    hostname: ccw-demo-webgateway
-    init: true
-    restart: unless-stopped
-    depends_on:
-      iris:
-        condition: service_started
-    environment:
-      ISC_DATA_DIRECTORY: /durable
-      ISC_CSP_INI_FILE: /config/CSP.ini
-      ISC_CSP_CONF_FILE: /config/CSP.conf
-    ports:
-      - "${IRIS_WEB_PORT:-52773}:80"
-    volumes:
-      - webgateway-data:/durable
-      - ./webgateway/CSP.ini:/config/CSP.ini:ro
-      - ./webgateway/CSP.conf:/config/CSP.conf:ro
-
-volumes:
-  iris-data:
-    name: ccw-demo-iris-data
-  webgateway-data:
-    name: ccw-demo-webgateway-data
+      - ./:/home/irisowner/dev
+    healthcheck:
+      test: ["CMD", "/irisHealth.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s

@@ -1,19 +1,17 @@
 # Install and run the demo
 
-This guide creates a disposable local IRIS Community Edition environment,
-installs the standalone cache-warmer package, loads the demo application,
-builds its two cubes, and verifies cache warming.
+This guide builds a disposable local IRIS Community Edition container that
+contains the standalone cache-warmer package, the demo application, its two
+built cubes, saved pivots, a dashboard, and a first set of warmed queries.
 
-The environment is for local development only. It uses known credentials,
-unencrypted HTTP, and named Docker volumes.
+The environment is for local development only. It uses known credentials and
+unencrypted HTTP.
 
 ## What the demo contains
 
-The demo installs:
-
 | Component | Name |
 | --- | --- |
-| Namespace and database | `CCWDEMO` |
+| Namespace | `USER`, with Analytics enabled |
 | Patient source class | `Demo.Model.Patient` |
 | Diagnosis source class | `Demo.Model.Diagnosis` |
 | Patient cube | `DemoPatients` |
@@ -27,94 +25,65 @@ cubes without rebuilding every fact.
 
 ## Prerequisites
 
-- Docker Desktop with Docker Compose v2
+- Docker Desktop, or Docker Engine with the Compose plugin
 - Git
-- Network access to the InterSystems Container Registry and to
-  `pm.community.intersystems.com` for the IPM installer
-- Permission to pull the configured IRIS Community and Web Gateway images
+- Network access to Docker Hub for the `intersystemsdc/iris-community` image
 - Optional: Visual Studio Code with the extensions recommended by the repository
 
-## Clone and configure
+Every command in this guide is the same in PowerShell, Command Prompt, WSL, and
+bash.
+
+## Build and start
 
 ```bash
 git clone https://github.com/josaliba/deepsee-cube-cache-warmer.git
 cd deepsee-cube-cache-warmer
+docker compose up -d --build --wait
 ```
 
-The public [`iris-community:latest-em`](https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=ACLOUD)
-image includes its Community Edition license; no external `iris.key` file is
-required. Authenticate to the InterSystems Container Registry only if pulling
-the separate Web Gateway image requires it:
+The `intersystemsdc/iris-community:latest-em` image includes IRIS Community
+Edition with its license, the InterSystems Package Manager, and a web server,
+so no registry login or license key is needed.
 
-```bash
-docker login containers.intersystems.com
-```
+While the image builds, `iris.script` runs once inside it and:
 
-The default configuration is:
+1. Enables Analytics for the `USER` namespace.
+2. Loads `dc.bi.CubeCacheWarmer` from the root `module.xml` with IPM, whose
+   Activate hook installs the dashboard-open and query-frequency audit hooks.
+3. Imports and compiles the demo application.
+4. Activates `Demo.CubeRegistry` and schedules its Cube Manager updater tasks.
+5. Creates 50 deterministic patients and 500 diagnoses, builds both cubes,
+   saves two pivots and the dashboard, and warms their queries.
+
+The command returns when IRIS reports healthy. Nothing else has to be run.
+
+To change the image tag or the published host ports, copy `.env.example` to
+`.env` and edit the copy:
 
 | Setting | Default |
 | --- | --- |
-| IRIS image | `containers.intersystems.com/intersystems/iris-community:latest-em` |
-| Web Gateway image | `containers.intersystems.com/intersystems/webgateway:latest-em` |
-| IRIS SuperServer host port | `1972` |
-| Web Gateway host port | `52773` |
-
-To override a value, copy `.env.example` to `.env` and edit the copy. Keep the
-IRIS and Web Gateway image releases compatible. Pin explicit image versions for
-a repeatable long-lived environment.
-
-## Start and wait for bootstrap
-
-```bash
-./bin/start
-```
-
-The script checks that the configured host ports are available, builds the IRIS
-image, initializes the named volumes, and starts IRIS and the Web Gateway.
-
-First-time bootstrap continues after `./bin/start` returns. Follow the IRIS log:
-
-```bash
-./bin/logs
-```
-
-Do not run the demo or tests until this line appears:
-
-```text
-Cube Cache Warmer Demo bootstrap complete.
-```
-
-Bootstrap performs the following work:
-
-1. Creates durable IRIS system storage.
-2. Creates the `CCWDEMO` database and namespace.
-3. Enables the namespace for interoperability and Analytics.
-4. Installs InterSystems Package Manager (IPM) if the durable volume predates
-   the image that ships it.
-5. Loads `dc.bi.CubeCacheWarmer` from the root `module.xml` with IPM, whose
-   Activate hook installs the dashboard-open and normalized-query-frequency
-   audit hooks.
-6. Imports and compiles the demo application.
-7. Activates `Demo.CubeRegistry` and updater tasks.
+| `IRIS_IMAGE` | `intersystemsdc/iris-community:latest-em` |
+| `IRIS_WEB_PORT` | `52773` |
+| `IRIS_SUPERSERVER_PORT` | `1972` |
 
 ## Open the development environment
 
 - Management Portal: <http://localhost:52773/csp/sys/UtilHome.csp>
-- Namespace: `CCWDEMO`
+- Analytics user portal: <http://localhost:52773/csp/user/_DeepSee.UserPortal.Home.zen>
+- Namespace: `USER`
 - Username: `_SYSTEM`
 - Password: `SYS`
 
-Open an ObjectScript terminal with:
+Open an ObjectScript terminal in the demo namespace:
 
 ```bash
-./bin/terminal
+docker compose exec iris iris session IRIS -U USER
 ```
 
-The terminal opens directly in `CCWDEMO`.
+## Recreate the demo content
 
-## Create the demo data and BI content
-
-In the ObjectScript terminal, run:
+The demo content already exists after the build. To reset and recreate it, run
+this in the ObjectScript terminal:
 
 ```objectscript
 set sc=##class(Demo.Util.Analytics).SetupDemo(50,500,1,1)
@@ -127,16 +96,6 @@ The arguments are:
 2. Number of diagnoses.
 3. Reset existing demo Patient and Diagnosis extents first.
 4. Warm saved queries after creating the BI content.
-
-With the default arguments, the method:
-
-1. Deletes existing demo Patient and Diagnosis rows.
-2. Creates 50 deterministic patients.
-3. Creates 500 deterministic diagnoses.
-4. Builds the patient and diagnosis cubes.
-5. Creates two saved pivots.
-6. Creates `Patient Overview.dashboard`.
-7. Executes the dashboard and pivot queries through the cache warmer.
 
 Do not use `pReset=1` after replacing the demo model with real registry data.
 
@@ -159,10 +118,10 @@ The warmer executes both the saved base pivot and the default-filter variant.
 Run the package and application tests:
 
 ```bash
-./bin/test
+docker compose exec iris iris session IRIS -U USER "##class(Demo.Util.Tests).RunAll()"
 ```
 
-Both suites should report `All PASSED`.
+Both suites should report `All PASSED`, followed by `All test suites passed.`
 
 From the ObjectScript terminal, verify source counts:
 
@@ -172,7 +131,7 @@ do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
 Inspect recent warmer runs in the Management Portal SQL page while using the
-`CCWDEMO` namespace:
+`USER` namespace:
 
 ```sql
 SELECT TOP 20 %ID AS RunId, CubeName, Mode, Outcome,
@@ -238,24 +197,29 @@ the compatibility tests instead.
 
 ## Stop, restart, or reset
 
-Stop containers while preserving IRIS and Web Gateway data:
+Stop the container and keep its state:
 
 ```bash
-./bin/stop
+docker compose stop
 ```
 
-Restart with:
+Start it again with `docker compose start`, or with `docker compose up -d` to
+recreate it after a configuration change.
+
+Remove the container:
 
 ```bash
-./bin/start
+docker compose down
 ```
 
-Delete the containers and both named volumes for a completely fresh install:
+The demo keeps no Docker volume, so `down` discards cube data, warm history,
+and any changes made inside the container. The next `docker compose up -d`
+starts again from the image, which already contains the freshly built demo.
+
+Rebuild on the newest community image, for example after the Community Edition
+license inside a cached image has expired:
 
 ```bash
-docker compose down -v
+docker compose build --pull
+docker compose up -d --wait
 ```
-
-The last command permanently deletes the local IRIS database, configuration,
-demo data, cache history, and Web Gateway state. The deleted volume contents are
-not recoverable through Docker.

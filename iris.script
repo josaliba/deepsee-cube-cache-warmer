@@ -1,0 +1,16 @@
+ ; Build-time setup for the Cube Cache Warmer demo. Runs once while the image is built.
+ zn "%SYS"
+ do ##class(Security.Users).UnExpireUserPasswords("*")
+ ; Enable IRIS Business Intelligence (Analytics) for the USER namespace web application.
+ set app("DeepSeeEnabled")=1 set sc=##class(Security.Applications).Modify("/csp/user",.app) if 'sc do $SYSTEM.Status.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1)
+
+ zn "USER"
+ ; Install the cache warmer from module.xml with IPM, exactly as end users would.
+ zpm "load /home/irisowner/dev -v":1
+
+ ; Load the demo application, activate its Cube Manager registry and create the demo content.
+ set sc=$SYSTEM.OBJ.ImportDir("/home/irisowner/dev/src","*.cls","ck",.errors,1) if 'sc do $SYSTEM.Status.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1)
+ set sc=##class(%DeepSee.CubeManager.Utils).SetActiveRegistry("Demo.CubeRegistry",1) if 'sc do $SYSTEM.Status.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1)
+ set sc=##class(%DeepSee.CubeManager.Utils).ScheduleUpdaterTasks() if 'sc do $SYSTEM.Status.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1)
+ set sc=##class(Demo.Util.Analytics).SetupDemo(50,500,1,1) if 'sc do $SYSTEM.Status.DisplayError(sc) do ##class(%SYSTEM.Process).Terminate(,1)
+ halt

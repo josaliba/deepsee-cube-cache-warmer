@@ -1,6 +1,0 @@
-[Actions]
-ModifyService:Name=%Service_CallIn,Enabled=1,AutheEnabled=48
-
-[Startup]
-SystemMode=CCW Demo Development
-
