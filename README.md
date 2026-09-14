@@ -2,6 +2,7 @@
 
 [![IPM](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer/badge.svg)](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer)
 [![Open Exchange](https://img.shields.io/badge/Open%20Exchange-deepsee--cube--cache--warmer-00b2a9)](https://openexchange.intersystems.com/package/deepsee-cube-cache-warmer)
+[![CI](https://github.com/josaliba/deepsee-cube-cache-warmer/actions/workflows/ci.yml/badge.svg)](https://github.com/josaliba/deepsee-cube-cache-warmer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 True query-frequency-aware cache warming for InterSystems IRIS Business Intelligence
@@ -14,8 +15,8 @@ This repository contains both:
 - a standalone, application-neutral cache-warmer package under
   [`packages/cube-cache-warmer`](packages/cube-cache-warmer/README.md),
   described by the IPM [`module.xml`](module.xml) at the repository root; and
-- a complete Docker Compose demo with two synchronized cubes,
-  saved pivots, a dashboard with default filters, tests, and operational helpers.
+- a one-command Docker demo with two synchronized cubes, saved pivots, a
+  dashboard with default filters, and tests.
 
 Source and issues: <https://github.com/josaliba/deepsee-cube-cache-warmer>. Licensed under the [MIT License](LICENSE).
 
@@ -139,9 +140,11 @@ behavior of each path, including concurrency, dashboard ranking, and outcomes.
 
 ## Compatibility
 
-The standalone package and the complete demo are verified on InterSystems IRIS
-2025.1.5. Validation covers a clean Docker bootstrap, restart bootstrap, both
-test suites, cube builds, saved dashboard and pivot creation, and cache warming.
+The standalone package is verified on InterSystems IRIS 2025.1.5 and 2026.1.
+The Docker demo builds on the `intersystemsdc/iris-community:latest-em` image,
+currently IRIS 2026.1 Community Edition, and its CI run covers the image build,
+both test suites, cube builds, saved dashboard and pivot creation, and cache
+warming.
 
 The checked-in Cube Manager registry deliberately uses the legacy registry
 model supported by IRIS 2025.1. Newer IRIS releases automatically upgrade that
@@ -156,8 +159,8 @@ LICENSE                    MIT License
 packages/cube-cache-warmer/  Standalone package sources and unit tests
 src/Demo/                  Demo models, cubes, registry, and helpers
 tests/Demo/                Demo smoke and cube-registry tests
-docker/                    Fresh-volume bootstrap and installer
-bin/                       Start, stop, test, terminal, and package scripts
+Dockerfile, compose.yaml   Demo container definition
+iris.script                Build-time setup: IPM load, demo import, cube builds
 docs/                      Demo, architecture, deployment, and operations guides
 ```
 
@@ -165,67 +168,55 @@ docs/                      Demo, architecture, deployment, and operations guides
 
 ### Prerequisites
 
-- Docker Desktop with Docker Compose v2
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/), or Docker
+  Engine with the Compose plugin
 - Git
-- Network access to `containers.intersystems.com` and
-  `pm.community.intersystems.com` (the image build installs IPM from the
-  community registry and loads the cache warmer through it)
 
-Clone the repository and enter it:
+Every command below is the same in PowerShell, Command Prompt, WSL, and bash.
+
+### Build and start
 
 ```bash
 git clone https://github.com/josaliba/deepsee-cube-cache-warmer.git
 cd deepsee-cube-cache-warmer
+docker compose up -d --build --wait
 ```
 
-The default [`iris-community:latest-em`](https://docs.intersystems.com/irislatest/csp/docbook/DocBook.UI.Page.cls?KEY=ACLOUD)
-image is public and includes a Community Edition license, so no external IRIS
-key is required. Authenticate to the InterSystems Container Registry only if
-access to the separate Web Gateway image requires it, then start the stack:
+The image build installs the cache warmer through IPM, enables Analytics for
+the `USER` namespace, loads the demo application, creates 50 patients and 500
+diagnoses, builds both cubes, saves two pivots and one dashboard, and warms
+their queries. The first build takes a few minutes. The command returns once
+IRIS reports healthy, and the demo is then complete.
+
+### Explore the demo
+
+- Management Portal: <http://localhost:52773/csp/sys/UtilHome.csp>
+- Analytics user portal: <http://localhost:52773/csp/user/_DeepSee.UserPortal.Home.zen>
+- IRIS SuperServer: `localhost:1972`
+- Namespace: `USER`
+- Username `_SYSTEM`, password `SYS`
+
+Open an ObjectScript terminal in the demo namespace:
 
 ```bash
-docker login containers.intersystems.com
-./bin/start
-./bin/logs
+docker compose exec iris iris session IRIS -U USER
 ```
 
-The start command returns after the containers start; first-time IRIS bootstrap
-continues asynchronously. Wait until the logs show:
-
-```text
-Cube Cache Warmer Demo bootstrap complete.
-```
-
-Then open an IRIS terminal and create the deterministic demo:
+Run the package and demo test suites:
 
 ```bash
-./bin/terminal
+docker compose exec iris iris session IRIS -U USER "##class(Demo.Util.Tests).RunAll()"
 ```
+
+Recreate the demo content at any time from the terminal:
 
 ```objectscript
 set sc=##class(Demo.Util.Analytics).SetupDemo(50,500,1,1)
 do $SYSTEM.OBJ.DisplayError(sc)
 ```
 
-This creates 50 patients and 500 diagnoses, builds both cubes, creates two saved
-pivots and one dashboard, and warms three queries.
-
-Run all package and application tests:
-
-```bash
-./bin/test
-```
-
-Local endpoints and development credentials:
-
-- Management Portal: <http://localhost:52773/csp/sys/UtilHome.csp>
-- IRIS SuperServer: `localhost:1972`
-- Namespace: `CCWDEMO`
-- Development user: `_SYSTEM`
-- Development password: `SYS`
-
-These credentials and the HTTP-only Web Gateway configuration are intended only
-for an isolated development workstation.
+The credentials and the HTTP-only web server are intended only for an isolated
+development workstation.
 
 ## Documentation
 
@@ -237,47 +228,43 @@ for an isolated development workstation.
 
 ## Build the distributable package
 
-Create a versioned archive from the version in the root `module.xml`:
+IPM packages the module from the root `module.xml`. In the demo terminal, run:
 
-```bash
-./bin/package-cache-warmer
+```objectscript
+zpm "package iris-bi-cube-cache-warmer -path /home/irisowner/dev/dist/iris-bi-cube-cache-warmer-1.0.0"
 ```
 
-The archive contains the package sources, tests, the license, and a
-`module.xml` rewritten so the extracted directory loads on its own. The script
-writes an ignored archive such as:
-
-```text
-dist/iris-bi-cube-cache-warmer-1.0.0.tar.gz
-```
-
-See [deployment.md](docs/deployment.md) for IPM installation, source-based
+This writes `dist/iris-bi-cube-cache-warmer-1.0.0.tgz` into the repository
+checkout, where Git ignores it. The archive holds the package sources and a
+`module.xml`, so an extracted copy loads with `zpm "load <directory>"`. See
+[deployment.md](docs/deployment.md) for IPM installation, source-based
 installation, Cube Manager configuration, upgrade, verification, and uninstall
 instructions.
 
 ## Common development commands
 
 ```bash
-./bin/start                    # Build and start the demo stack
-./bin/logs                     # Follow IRIS/bootstrap logs
-./bin/terminal                 # Open CCWDEMO ObjectScript terminal
-./bin/test                     # Compile and run package and demo tests
-./bin/package-cache-warmer     # Create the standalone package archive
-./bin/stop                     # Stop containers and preserve their volumes
-docker compose down -v         # Delete containers and all local demo data
+docker compose up -d --build --wait   # Build the image and start the demo
+docker compose logs -f iris           # Follow IRIS logs
+docker compose exec iris iris session IRIS -U USER                                    # Terminal
+docker compose exec iris iris session IRIS -U USER "##class(Demo.Util.Tests).RunAll()"  # Tests
+docker compose stop                   # Stop the container and keep its state
+docker compose down                   # Remove the container; the next start is a fresh demo
+docker compose build --pull           # Rebuild on the newest community image
 ```
 
-The final command permanently deletes the project's IRIS and Web Gateway named
-volumes. Use it only when a completely fresh installation is required.
+The demo keeps no Docker volume. Stopping and starting preserves data inside
+the container, while `docker compose down` discards it and the next `up`
+recreates the demo from the image. Community Edition images carry a license
+that expires, so rebuild with `--pull` when a cached image refuses to start.
 
 ## Configuration and security
 
-Copy `.env.example` to `.env` to override image tags or host ports. Pin the IRIS
-and Web Gateway images to matching explicit versions before using the demo as a
-long-lived environment.
+Copy `.env.example` to `.env` to override the image tag or the host ports, for
+example when a local IRIS instance already uses port 1972.
 
-The `.env` file, generated archives, runtime data, and local editor settings are
-excluded from Git. Do not commit credentials or other sensitive material.
+The `.env` file, generated archives, and local editor settings are excluded
+from Git. Do not commit credentials or other sensitive material.
 
 Before production deployment, review authentication, TLS, authorization,
 licensing, auditing, backups, data retention, resource limits, and applicable

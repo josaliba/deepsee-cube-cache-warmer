@@ -1,8 +1,8 @@
 # Deploy the standalone package
 
 The deployable unit is `packages/cube-cache-warmer`, described by the
-IPM `module.xml` at the repository root. It has no dependency on the Disease
-Registry demo, Docker, application cube names, namespace names, or the demo's
+IPM `module.xml` at the repository root. It has no dependency on the demo
+application, Docker, application cube names, namespace names, or the demo's
 Cube Manager registry.
 
 ## Requirements
@@ -15,9 +15,9 @@ Cube Manager registry.
   `^DeepSee.AuditQueryCode`.
 - A runtime identity allowed to query the cubes and execute the saved MDX.
 
-The package test suite has been verified on InterSystems IRIS 2025.1.5. The
-Docker demo also verifies the IRIS 2025.1 Cube Manager hook and
-registry integration used by the background warmer.
+The package test suite has been verified on InterSystems IRIS 2025.1.5 and
+2026.1. The Docker demo also verifies the Cube Manager hook and registry
+integration used by the background warmer.
 
 Install the package separately into every namespace where it will be used. Its
 classes, persistent history, dashboard/query usage, both audit hooks, and locks are
@@ -25,39 +25,26 @@ namespace-scoped.
 
 ## Build the artifact
 
-From the repository root:
+The module is normally installed from the community registry, so an archive is
+only needed for instances without registry access. IPM builds it from the root
+`module.xml`. In a terminal of a namespace where the module is loaded, such as
+the demo container, run:
 
-```bash
-./bin/package-cache-warmer
+```objectscript
+zpm "package iris-bi-cube-cache-warmer -path /home/irisowner/dev/dist/iris-bi-cube-cache-warmer-1.0.0"
 ```
 
-The script reads the version from the root `module.xml` and writes:
-
-```text
-dist/cube-cache-warmer-<version>.tar.gz
-```
-
-The archive contains the standalone package directory, including:
-
-```text
-LICENSE
-README.md
-module.xml
-src/dc/bi/CubeCacheWarmer/
-tests/dc/bi/CubeCacheWarmer/Test/
-```
-
-The archived `module.xml` is generated from the root one with its
-repository-relative paths rewritten, so the extracted directory is loadable on
-its own.
+The command writes `dist/iris-bi-cube-cache-warmer-1.0.0.tgz`, which contains
+`module.xml`, the package sources, the license, and the package README. Add
+`-include-tests` to include the unit tests. Extract the archive on the target and load the resulting directory with
+`zpm "load <directory>"`.
 
 Generated archives are ignored by Git. Publish them through the organization's
 approved artifact mechanism rather than committing binaries to the repository.
 
 Before a release, update the `<Version>` in the root `module.xml`, run the
-tests, build
-the archive, inspect its contents, and tag the corresponding commit according to
-the team's release policy.
+tests, build the archive, inspect its contents, and tag the corresponding
+commit according to the team's release policy.
 
 ## Install with InterSystems Package Manager
 

@@ -3,6 +3,4 @@
 *.mac text eol=lf
 *.int text eol=lf
 *.inc text eol=lf
-*.cpf text eol=lf
-*.sh text eol=lf
-
+*.script text eol=lf

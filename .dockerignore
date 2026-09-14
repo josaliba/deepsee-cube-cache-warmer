@@ -1,10 +1,9 @@
 .git
-.gitignore
+.github
+.vscode
+.env
 .DS_Store
 **/.DS_Store
-.env
-.vscode
 README.md
 docs
-data
-license
+dist

@@ -21,7 +21,7 @@ It provides:
 - an Analytics-enabled namespace; and
 - a user that can compile the package and update its persistent tables.
 
-The package test suite has been verified on InterSystems IRIS 2025.1.5.
+The package test suite has been verified on InterSystems IRIS 2025.1.5 and 2026.1.
 
 ## Package contents
 
@@ -39,9 +39,9 @@ src/dc/bi/CubeCacheWarmer/
 ```
 
 The IPM `module.xml` for this package lives at the repository root so the
-repository itself is IPM-loadable. Run `./bin/package-cache-warmer` from the
-repository root to produce a self-contained archive of this directory with its
-own `module.xml` and license for distribution.
+repository itself is IPM-loadable. IPM's `package` command, described in
+[deployment.md](../../docs/deployment.md), produces a self-contained archive
+with its own `module.xml` for distribution.
 
 ## Install with InterSystems Package Manager
 

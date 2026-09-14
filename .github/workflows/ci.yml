@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image and start the demo
+        run: docker compose up -d --build --wait
+
+      - name: Run the package and demo tests
+        run: docker compose exec -T iris iris session IRIS -U USER "##class(Demo.Util.Tests).RunAll()"
+
+      - name: Show IRIS logs on failure
+        if: failure()
+        run: docker compose logs iris
+
+      - name: Stop the demo
+        if: always()
+        run: docker compose down -v

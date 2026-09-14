@@ -1,9 +1,13 @@
 Class Demo.Test.Analytics Extends %UnitTest.TestCase
 {
 
-Method TestInteroperabilityEnabled()
+Method TestAnalyticsEnabled()
 {
-  Do $$$AssertTrue(##class(%Library.EnsembleMgr).IsEnsembleNamespace($Namespace))
+  Set application = "/csp/"_$ZConvert($Namespace, "L")
+  New $Namespace
+  Set $Namespace = "%SYS"
+  Do $$$AssertStatusOK(##class(Security.Applications).Get(application, .properties))
+  Do $$$AssertEquals($Get(properties("DeepSeeEnabled")), 1)
 }
 
 Method TestSynchronizationIsEnabled()

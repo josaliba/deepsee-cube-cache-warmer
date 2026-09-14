@@ -1,25 +1,14 @@
-ARG IRIS_IMAGE=containers.intersystems.com/intersystems/iris-community:latest-em
-FROM ${IRIS_IMAGE}
+ARG IMAGE=intersystemsdc/iris-community:latest-em
+FROM ${IMAGE}
 
-USER root
+WORKDIR /home/irisowner/dev
+COPY --chown=${ISC_PACKAGE_MGRUSER}:${ISC_PACKAGE_IRISGROUP} . .
 
-RUN mkdir -p /opt/ccw-demo/docker /workspace/src /workspace/tests /workspace/packages \
-    && chown -R ${ISC_PACKAGE_MGRUSER}:${ISC_PACKAGE_IRISGROUP} \
-       /opt/ccw-demo /workspace
+# The image entrypoint initialises a USER namespace with irissqlcli on first
+# start. That step fails on IRIS 2026.1 and stops the container, and everything
+# it would do is done in iris.script instead, so mark it as already completed.
+RUN date > ${ISC_PACKAGE_INSTALLDIR}/iris.init
 
-COPY --chown=${ISC_PACKAGE_MGRUSER}:${ISC_PACKAGE_IRISGROUP} docker/ /opt/ccw-demo/docker/
-COPY --chown=${ISC_PACKAGE_MGRUSER}:${ISC_PACKAGE_IRISGROUP} module.xml /workspace/module.xml
-COPY --chown=${ISC_PACKAGE_MGRUSER}:${ISC_PACKAGE_IRISGROUP} src/ /workspace/src/
-COPY --chown=${ISC_PACKAGE_MGRUSER}:${ISC_PACKAGE_IRISGROUP} tests/ /workspace/tests/
-COPY --chown=${ISC_PACKAGE_MGRUSER}:${ISC_PACKAGE_IRISGROUP} packages/ /workspace/packages/
-
-RUN chmod 0755 /opt/ccw-demo/docker/bootstrap.sh
-
-WORKDIR /workspace
-USER ${ISC_PACKAGE_MGRUSER}
-
-# Install InterSystems Package Manager (IPM) into the image so the demo can
-# load the cache warmer through its module.xml exactly as end users would.
 RUN iris start IRIS \
-    && iris session IRIS < /opt/ccw-demo/docker/install-ipm.script \
-    && iris stop IRIS quietly
+ && iris session IRIS < iris.script \
+ && iris stop IRIS quietly
