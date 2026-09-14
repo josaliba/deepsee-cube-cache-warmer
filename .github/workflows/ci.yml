@@ -24,3 +24,41 @@ jobs:
       - name: Stop the demo
         if: always()
         run: docker compose down -v
+
+  # Hosted Windows runners cannot run Linux containers, so this job checks the
+  # Windows-side details only: line endings after a default Windows checkout,
+  # the compose file under the Windows Docker CLI, and PowerShell quoting of the
+  # documented test command. The demo itself is exercised by the job above.
+  windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - name: Use the common Windows line-ending setting
+        run: git config --global core.autocrlf true
+
+      - uses: actions/checkout@v4
+
+      - name: Files that IRIS reads must keep LF line endings
+        shell: pwsh
+        run: |
+          $files = @('iris.script', 'Dockerfile', 'compose.yaml', 'module.xml') +
+                   (Get-ChildItem -Recurse -File -Filter *.cls | ForEach-Object { $_.FullName })
+          $crlf = $files | Where-Object { (Get-Content $_ -Raw) -match "`r" }
+          if ($crlf) {
+            $crlf | ForEach-Object { Write-Host "CRLF line endings: $_" }
+            throw 'These files are read inside the Linux container and must use LF line endings.'
+          }
+          Write-Host "Checked $($files.Count) files."
+
+      - name: Compose file is valid for the Windows Docker CLI
+        shell: pwsh
+        run: docker compose config --quiet
+
+      - name: Documented test command survives PowerShell argument passing
+        shell: pwsh
+        run: |
+          $expected = '##class(Demo.Util.Tests).RunAll()'
+          $actual = (& cmd /c echo "##class(Demo.Util.Tests).RunAll()").Trim()
+          if ($actual -ne $expected) {
+            throw "PowerShell passed the argument as: $actual"
+          }
+          Write-Host 'Argument reached the native command unchanged.'
