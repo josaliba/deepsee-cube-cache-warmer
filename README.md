@@ -231,10 +231,10 @@ development workstation.
 IPM packages the module from the root `module.xml`. In the demo terminal, run:
 
 ```objectscript
-zpm "package iris-bi-cube-cache-warmer -path /home/irisowner/dev/dist/iris-bi-cube-cache-warmer-1.0.0"
+zpm "package iris-bi-cube-cache-warmer -path /home/irisowner/dev/dist/iris-bi-cube-cache-warmer-1.0.1"
 ```
 
-This writes `dist/iris-bi-cube-cache-warmer-1.0.0.tgz` into the repository
+This writes `dist/iris-bi-cube-cache-warmer-1.0.1.tgz` into the repository
 checkout, where Git ignores it. The archive holds the package sources and a
 `module.xml`, so an extracted copy loads with `zpm "load <directory>"`. See
 [deployment.md](docs/deployment.md) for IPM installation, source-based

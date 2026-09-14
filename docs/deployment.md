@@ -31,10 +31,10 @@ only needed for instances without registry access. IPM builds it from the root
 the demo container, run:
 
 ```objectscript
-zpm "package iris-bi-cube-cache-warmer -path /home/irisowner/dev/dist/iris-bi-cube-cache-warmer-1.0.0"
+zpm "package iris-bi-cube-cache-warmer -path /home/irisowner/dev/dist/iris-bi-cube-cache-warmer-1.0.1"
 ```
 
-The command writes `dist/iris-bi-cube-cache-warmer-1.0.0.tgz`, which contains
+The command writes `dist/iris-bi-cube-cache-warmer-1.0.1.tgz`, which contains
 `module.xml`, the package sources, the license, and the package README. Add
 `-include-tests` to include the unit tests. Extract the archive on the target and load the resulting directory with
 `zpm "load <directory>"`.
@@ -59,7 +59,7 @@ zpm "install iris-bi-cube-cache-warmer"
 To pin a specific release, append the version:
 
 ```objectscript
-zpm "install iris-bi-cube-cache-warmer 1.0.0"
+zpm "install iris-bi-cube-cache-warmer 1.0.1"
 ```
 
 For an instance without registry access, or to install unreleased changes,
