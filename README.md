@@ -1,6 +1,6 @@
 # DeepSee Cube Cache Warmer
 
-[![IPM](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer/badge.svg)](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer)
+[![IPM](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fpm.community.intersystems.com%2Fpackages%2Firis-bi-cube-cache-warmer%2F&query=%24.version&label=IPM&color=00b2a9)](https://pm.community.intersystems.com/packages/iris-bi-cube-cache-warmer/)
 [![Open Exchange](https://img.shields.io/badge/Open%20Exchange-deepsee--cube--cache--warmer-00b2a9)](https://openexchange.intersystems.com/package/deepsee-cube-cache-warmer)
 [![CI](https://github.com/josaliba/deepsee-cube-cache-warmer/actions/workflows/ci.yml/badge.svg)](https://github.com/josaliba/deepsee-cube-cache-warmer/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
